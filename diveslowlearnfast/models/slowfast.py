@@ -14,6 +14,8 @@ from torchvision.ops import roi_align
 
 from fvcore.nn.weight_init import c2_msra_fill, c2_xavier_fill
 
+from diveslowlearnfast.config.defaults import Config
+
 
 def get_norm(cfg):
     """
@@ -23,11 +25,11 @@ def get_norm(cfg):
     Returns:
         nn.Module: the normalization layer.
     """
-    if cfg['BN']['NORM_TYPE'] in {"batchnorm", "sync_batchnorm_apex"}:
+    if cfg.BN.NORM_TYPE in {"batchnorm", "sync_batchnorm_apex"}:
         return nn.BatchNorm3d
-    elif cfg['BN']['NORM_TYPE'] == "sub_batchnorm":
+    elif cfg.BN.NORM_TYPE == "sub_batchnorm":
         return partial(SubBatchNorm3d, num_splits=cfg.BN.NUM_SPLITS)
-    elif cfg['BN']['NORM_TYPE'] == "sync_batchnorm":
+    elif cfg.BN.NORM_TYPE == "sync_batchnorm":
         return partial(
             NaiveSyncBatchNorm3d,
             num_sync_devices=cfg['BN']['NUM_SYNC_DEVICES'],
@@ -620,7 +622,6 @@ class Nonlocal(nn.Module):
         # Zero initializing the final convolution output.
         self.conv_out.zero_init = zero_init_final_conv
 
-        # TODO: change the name to `norm`
         self.bn = norm_module(
             num_features=self.dim,
             eps=self.norm_eps,
@@ -1594,7 +1595,7 @@ class ResNetBasicHead(nn.Module):
             dropout_rate=0.0,
             act_func="softmax",
             detach_final_fc=False,
-            cfg=None,
+            cfg: Config=None,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -1640,25 +1641,7 @@ class ResNetBasicHead(nn.Module):
             self.dropout = nn.Dropout(dropout_rate)
         # Perform FC in a fully convolutional manner. The FC layer will be
         # initialized with a different std comparing to convolutional layers.
-        if cfg['CONTRASTIVE']['NUM_MLP_LAYERS'] == 1:
-            self.projection = nn.Linear(sum(dim_in), num_classes, bias=True)
-        else:
-            self.projection = MLPHead(
-                sum(dim_in),
-                num_classes,
-                cfg['CONTRASTIVE']['MLP_DIM'],
-                cfg['CONTRASTIVE']['NUM_MLP_LAYERS'],
-                bn_on=cfg['CONTRASTIVE']['BN_MLP'],
-                bn_sync_num=(
-                    cfg['BN']['NUM_SYNC_DEVICES']
-                    if cfg['CONTRASTIVE']['BN_SYNC_MLP']
-                    else 1
-                ),
-                global_sync=(
-                        cfg['CONTRASTIVE']['BN_SYNC_MLP']
-                        and cfg['BN']['GLOBAL_SYNC']
-                ),
-            )
+        self.projection = nn.Linear(sum(dim_in), num_classes, bias=True)
 
         # Softmax for evaluation and testing.
         if act_func == "softmax":
@@ -1671,28 +1654,6 @@ class ResNetBasicHead(nn.Module):
             raise NotImplementedError(
                 "{} is not supported as an activation" "function.".format(act_func)
             )
-
-        if cfg['CONTRASTIVE']['PREDICTOR_DEPTHS']:
-            d_in = num_classes
-            for i, n_layers in enumerate(cfg['CONTRASTIVE']['PREDICTOR_DEPTHS']):
-                local_mlp = MLPHead(
-                    d_in,
-                    num_classes,
-                    cfg['CONTRASTIVE']['MLP_DIM'],
-                    n_layers,
-                    bn_on=cfg['CONTRASTIVE']['BN_MLP'],
-                    flatten=False,
-                    bn_sync_num=(
-                        cfg['BN']['NUM_SYNC_DEVICES']
-                        if cfg['CONTRASTIVE']['BN_SYNC_MLP']
-                        else 1
-                    ),
-                    global_sync=(
-                            cfg['CONTRASTIVE']['BN_SYNC_MLP']
-                            and cfg['BN']['GLOBAL_SYNC']
-                    ),
-                )
-                self.predictors.append(local_mlp)
 
     def forward(self, inputs):
         assert (
@@ -1715,7 +1676,7 @@ class ResNetBasicHead(nn.Module):
 
         if (
                 x.shape[1:4] == torch.Size([1, 1, 1])
-                and self.cfg['MODEL']['MODEL_NAME'] == "ContrastiveModel"
+                and self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
         ):
             x = x.view(x.shape[0], -1)
 
@@ -1932,7 +1893,7 @@ class SlowFast(nn.Module):
     https://arxiv.org/pdf/1812.03982.pdf
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Config):
         """
         The `__init__` method of any subclass should also contain these
             arguments.
@@ -1943,14 +1904,14 @@ class SlowFast(nn.Module):
         super(SlowFast, self).__init__()
         self.norm_module = get_norm(cfg)
         self.cfg = cfg
-        self.enable_detection = cfg['DETECTION']['ENABLE']
+        self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
         init_weights(
             self,
-            cfg['MODEL']['FC_INIT_STD'],
-            cfg['RESNET']['ZERO_INIT_FINAL_BN'],
-            cfg['RESNET']['ZERO_INIT_FINAL_CONV'],
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -1961,26 +1922,23 @@ class SlowFast(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
-        assert cfg['MODEL']['ARCH'] in _POOL1.keys()
-        pool_size = _POOL1[cfg['MODEL']['ARCH']]
+        assert cfg.MODEL.ARCH in _POOL1.keys()
+        pool_size = _POOL1[cfg.MODEL.ARCH]
         assert len({len(pool_size), self.num_pathways}) == 1
-        assert cfg['RESNET']['DEPTH'] in _MODEL_STAGE_DEPTH.keys()
+        assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
 
-        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg['RESNET']['DEPTH']]
+        (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
 
-        num_groups = cfg['RESNET']['NUM_GROUPS']
-        width_per_group = cfg['RESNET']['WIDTH_PER_GROUP']
+        num_groups = cfg.RESNET.NUM_GROUPS
+        width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
-        out_dim_ratio = (
-                cfg['SLOWFAST']['BETA_INV'] //
-                cfg['SLOWFAST']['FUSION_CONV_CHANNEL_RATIO']
-        )
+        out_dim_ratio = cfg.SLOWFAST.BETA_INV // cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO
 
-        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg['MODEL']['ARCH']]
+        temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
         self.s1 = VideoModelStem(
-            dim_in=cfg['DATA']['INPUT_CHANNEL_NUM'],
-            dim_out=[width_per_group, width_per_group // cfg['SLOWFAST']['BETA_INV']],
+            dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
+            dim_out=[width_per_group, width_per_group // cfg.SLOWFAST.BETA_INV],
             kernel=[temp_kernel[0][0] + [7, 7], temp_kernel[0][1] + [7, 7]],
             stride=[[1, 2, 2]] * 2,
             padding=[
@@ -1990,41 +1948,41 @@ class SlowFast(nn.Module):
             norm_module=self.norm_module,
         )
         self.s1_fuse = FuseFastToSlow(
-            width_per_group // cfg['SLOWFAST']['BETA_INV'],
-            cfg['SLOWFAST']['FUSION_CONV_CHANNEL_RATIO'],
-            cfg['SLOWFAST']['FUSION_KERNEL_SZ'],
-            cfg['SLOWFAST']['ALPHA'],
+            width_per_group // cfg.SLOWFAST.BETA_INV,
+            cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
+            cfg.SLOWFAST.FUSION_KERNEL_SZ,
+            cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
         )
 
         self.s2 = ResStage(
             dim_in=[
                 width_per_group + width_per_group // out_dim_ratio,
-                width_per_group // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group // cfg.SLOWFAST.BETA_INV,
             ],
             dim_out=[
                 width_per_group * 4,
-                width_per_group * 4 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
             ],
-            dim_inner=[dim_inner, dim_inner // cfg['SLOWFAST']['BETA_INV']],
+            dim_inner=[dim_inner, dim_inner // cfg.SLOWFAST.BETA_INV],
             temp_kernel_sizes=temp_kernel[1],
-            stride=cfg['RESNET']['SPATIAL_STRIDES'][0],
+            stride=cfg.RESNET.SPATIAL_STRIDES[0],
             num_blocks=[d2] * 2,
             num_groups=[num_groups] * 2,
-            num_block_temp_kernel=cfg['RESNET']['NUM_BLOCK_TEMP_KERNEL'][0],
-            nonlocal_inds=cfg['NONLOCAL']['LOCATION'][0],
-            nonlocal_group=cfg['NONLOCAL']['GROUP'][0],
-            nonlocal_pool=cfg['NONLOCAL']['POOL'][0],
-            instantiation=cfg['NONLOCAL']['INSTANTIATION'],
-            trans_func_name=cfg['RESNET']['TRANS_FUNC'],
-            dilation=cfg['RESNET']['SPATIAL_DILATIONS'][0],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[0],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
+            nonlocal_group=cfg.NONLOCAL.GROUP[0],
+            nonlocal_pool=cfg.NONLOCAL.POOL[0],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
         )
         self.s2_fuse = FuseFastToSlow(
-            width_per_group * 4 // cfg['SLOWFAST']['BETA_INV'],
-            cfg['SLOWFAST']['FUSION_CONV_CHANNEL_RATIO'],
-            cfg['SLOWFAST']['FUSION_KERNEL_SZ'],
-            cfg['SLOWFAST']['ALPHA'],
+            width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
+            cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
+            cfg.SLOWFAST.FUSION_KERNEL_SZ,
+            cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
         )
 
@@ -2039,144 +1997,139 @@ class SlowFast(nn.Module):
         self.s3 = ResStage(
             dim_in=[
                 width_per_group * 4 + width_per_group * 4 // out_dim_ratio,
-                width_per_group * 4 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
             ],
             dim_out=[
                 width_per_group * 8,
-                width_per_group * 8 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
             ],
-            dim_inner=[dim_inner * 2, dim_inner * 2 // cfg['SLOWFAST']['BETA_INV']],
+            dim_inner=[dim_inner * 2, dim_inner * 2 // cfg.SLOWFAST.BETA_INV],
             temp_kernel_sizes=temp_kernel[2],
-            stride=cfg['RESNET']['SPATIAL_STRIDES'][1],
+            stride=cfg.RESNET.SPATIAL_STRIDES[1],
             num_blocks=[d3] * 2,
             num_groups=[num_groups] * 2,
-            num_block_temp_kernel=cfg['RESNET']['NUM_BLOCK_TEMP_KERNEL'][1],
-            nonlocal_inds=cfg['NONLOCAL']['LOCATION'][1],
-            nonlocal_group=cfg['NONLOCAL']['GROUP'][1],
-            nonlocal_pool=cfg['NONLOCAL']['POOL'][1],
-            instantiation=cfg['NONLOCAL']['INSTANTIATION'],
-            trans_func_name=cfg['RESNET']['TRANS_FUNC'],
-            dilation=cfg['RESNET']['SPATIAL_DILATIONS'][1],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[1],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[1],
+            nonlocal_group=cfg.NONLOCAL.GROUP[1],
+            nonlocal_pool=cfg.NONLOCAL.POOL[1],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
             norm_module=self.norm_module,
         )
         self.s3_fuse = FuseFastToSlow(
-            width_per_group * 8 // cfg['SLOWFAST']['BETA_INV'],
-            cfg['SLOWFAST']['FUSION_CONV_CHANNEL_RATIO'],
-            cfg['SLOWFAST']['FUSION_KERNEL_SZ'],
-            cfg['SLOWFAST']['ALPHA'],
+            width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
+            cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
+            cfg.SLOWFAST.FUSION_KERNEL_SZ,
+            cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
         )
 
         self.s4 = ResStage(
             dim_in=[
                 width_per_group * 8 + width_per_group * 8 // out_dim_ratio,
-                width_per_group * 8 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
             ],
             dim_out=[
                 width_per_group * 16,
-                width_per_group * 16 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
             ],
-            dim_inner=[dim_inner * 4, dim_inner * 4 // cfg['SLOWFAST']['BETA_INV']],
+            dim_inner=[dim_inner * 4, dim_inner * 4 // cfg.SLOWFAST.BETA_INV],
             temp_kernel_sizes=temp_kernel[3],
-            stride=cfg['RESNET']['SPATIAL_STRIDES'][2],
+            stride=cfg.RESNET.SPATIAL_STRIDES[2],
             num_blocks=[d4] * 2,
             num_groups=[num_groups] * 2,
-            num_block_temp_kernel=cfg['RESNET']['NUM_BLOCK_TEMP_KERNEL'][2],
-            nonlocal_inds=cfg['NONLOCAL']['LOCATION'][2],
-            nonlocal_group=cfg['NONLOCAL']['GROUP'][2],
-            nonlocal_pool=cfg['NONLOCAL']['POOL'][2],
-            instantiation=cfg['NONLOCAL']['INSTANTIATION'],
-            trans_func_name=cfg['RESNET']['TRANS_FUNC'],
-            dilation=cfg['RESNET']['SPATIAL_DILATIONS'][2],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[2],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[2],
+            nonlocal_group=cfg.NONLOCAL.GROUP[2],
+            nonlocal_pool=cfg.NONLOCAL.POOL[2],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
             norm_module=self.norm_module,
         )
         self.s4_fuse = FuseFastToSlow(
-            width_per_group * 16 // cfg['SLOWFAST']['BETA_INV'],
-            cfg['SLOWFAST']['FUSION_CONV_CHANNEL_RATIO'],
-            cfg['SLOWFAST']['FUSION_KERNEL_SZ'],
-            cfg['SLOWFAST']['ALPHA'],
+            width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
+            cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
+            cfg.SLOWFAST.FUSION_KERNEL_SZ,
+            cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
         )
 
         self.s5 = ResStage(
             dim_in=[
                 width_per_group * 16 + width_per_group * 16 // out_dim_ratio,
-                width_per_group * 16 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
             ],
             dim_out=[
                 width_per_group * 32,
-                width_per_group * 32 // cfg['SLOWFAST']['BETA_INV'],
+                width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
             ],
-            dim_inner=[dim_inner * 8, dim_inner * 8 // cfg['SLOWFAST']['BETA_INV']],
+            dim_inner=[dim_inner * 8, dim_inner * 8 // cfg.SLOWFAST.BETA_INV],
             temp_kernel_sizes=temp_kernel[4],
-            stride=cfg['RESNET']['SPATIAL_STRIDES'][3],
+            stride=cfg.RESNET.SPATIAL_STRIDES[3],
             num_blocks=[d5] * 2,
             num_groups=[num_groups] * 2,
-            num_block_temp_kernel=cfg['RESNET']['NUM_BLOCK_TEMP_KERNEL'][3],
-            nonlocal_inds=cfg['NONLOCAL']['LOCATION'][3],
-            nonlocal_group=cfg['NONLOCAL']['GROUP'][3],
-            nonlocal_pool=cfg['NONLOCAL']['POOL'][3],
-            instantiation=cfg['NONLOCAL']['INSTANTIATION'],
-            trans_func_name=cfg['RESNET']['TRANS_FUNC'],
-            dilation=cfg['RESNET']['SPATIAL_DILATIONS'][3],
+            num_block_temp_kernel=cfg.RESNET.NUM_BLOCK_TEMP_KERNEL[3],
+            nonlocal_inds=cfg.NONLOCAL.LOCATION[3],
+            nonlocal_group=cfg.NONLOCAL.GROUP[3],
+            nonlocal_pool=cfg.NONLOCAL.POOL[3],
+            instantiation=cfg.NONLOCAL.INSTANTIATION,
+            trans_func_name=cfg.RESNET.TRANS_FUNC,
+            dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
             norm_module=self.norm_module,
         )
 
-        # [Similar changes for s2_fuse, s3, s3_fuse, s4, s4_fuse, s5]
-
-        if cfg['DETECTION']['ENABLE']:
+        if cfg.DETECTION.ENABLE:
             self.head = ResNetRoIHead(
                 dim_in=[
                     width_per_group * 32,
-                    width_per_group * 32 // cfg['SLOWFAST']['BETA_INV'],
+                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
                 ],
-                num_classes=cfg['MODEL']['NUM_CLASSES'],
+                num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[
                     [
-                        cfg['DATA']['NUM_FRAMES'] //
-                        cfg['SLOWFAST']['ALPHA'] //
-                        pool_size[0][0],
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
                         1,
                         1,
                     ],
-                    [cfg['DATA']['NUM_FRAMES'] // pool_size[1][0], 1, 1],
+                    [cfg.DATA.NUM_FRAMES // pool_size[1][0], 1, 1],
                 ],
-                resolution=[[cfg['DETECTION']['ROI_XFORM_RESOLUTION']] * 2] * 2,
-                scale_factor=[cfg['DETECTION']['SPATIAL_SCALE_FACTOR']] * 2,
-                dropout_rate=cfg['MODEL']['DROPOUT_RATE'],
-                act_func=cfg['MODEL']['HEAD_ACT'],
-                aligned=cfg['DETECTION']['ALIGNED'],
-                detach_final_fc=cfg['MODEL']['DETACH_FINAL_FC'],
+                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2] * 2,
+                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR] * 2,
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
+            print()
             self.head = ResNetBasicHead(
                 dim_in=[
                     width_per_group * 32,
-                    width_per_group * 32 // cfg['SLOWFAST']['BETA_INV'],
+                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
                 ],
-                num_classes=cfg['MODEL']['NUM_CLASSES'],
+                num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=(
                     [None, None]
-                    if cfg['MULTIGRID']['SHORT_CYCLE']
-                       or cfg['MODEL']['MODEL_NAME'] == "ContrastiveModel"
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                       or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                     else [
                         [
-                            cfg['DATA']['NUM_FRAMES']
-                            // cfg['SLOWFAST']['ALPHA']
-                            // pool_size[0][0],
-                            cfg['DATA']['TRAIN_CROP_SIZE'] // 32 // pool_size[0][1],
-                            cfg['DATA']['TRAIN_CROP_SIZE'] // 32 // pool_size[0][2],
+                            cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
                         ],
                         [
-                            cfg['DATA']['NUM_FRAMES'] // pool_size[1][0],
-                            cfg['DATA']['TRAIN_CROP_SIZE'] // 32 // pool_size[1][1],
-                            cfg['DATA']['TRAIN_CROP_SIZE'] // 32 // pool_size[1][2],
+                            cfg.DATA.NUM_FRAMES // pool_size[1][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
                         ],
                     ]
-                ),
-                dropout_rate=cfg['MODEL']['DROPOUT_RATE'],
-                act_func=cfg['MODEL']['HEAD_ACT'],
-                detach_final_fc=cfg['MODEL']['DETACH_FINAL_FC'],
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
                 cfg=cfg,
             )
 

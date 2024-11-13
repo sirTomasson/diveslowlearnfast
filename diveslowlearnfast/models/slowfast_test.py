@@ -1,15 +1,17 @@
 import unittest
 import torch
 
+from diveslowlearnfast.config.defaults import Config
 from diveslowlearnfast.models import SlowFast
 from diveslowlearnfast.models.slowfast import VideoModelStem
 import diveslowlearnfast.models.slowfast as sf
-from diveslowlearnfast.config.defaults import defaults as cfg
 
 
 class SlowFastTest(unittest.TestCase):
     def test_should_forward_slowfast(self):
+        cfg = Config()
         model = SlowFast(cfg)
+
         batch_size = 8
         slow_frames = 4
         fast_frames = 32
@@ -19,10 +21,13 @@ class SlowFastTest(unittest.TestCase):
         x_slow = torch.randn(batch_size, 3, slow_frames, height, width)
         x_fast = torch.randn(batch_size, 3, fast_frames, height, width)
         x = [x_slow, x_fast]
+
         o = model(x)
         self.assertEqual(o.size(), torch.Size([8, 48]))
 
     def test_should_forward_stem(self):
+        cfg = Config()
+
         temp_kernel = [
             [[1], [5]],  # conv1 temporal kernel for slow and fast pathway.
             [[1], [3]],  # res2 temporal kernel for slow and fast pathway.
