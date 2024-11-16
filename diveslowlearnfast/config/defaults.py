@@ -89,7 +89,6 @@ class MultiGridConfig:
 @dataclass
 class TrainConfig:
     BATCH_SIZE: int = 4
-    PIN_MEMORY: bool = True
 
 class SolverConfig:
     BASE_LR = 0.1
@@ -99,6 +98,12 @@ class SolverConfig:
     WARMUP_EPOCHS = 34.0
     WARMUP_START_LR = 0.01
     OPTIMIZING_METHOD = 'sgd'
+
+
+@dataclass
+class DataLoaderConfig:
+    NUM_WORKERS = 8
+    PIN_MEMORY = True
 
 @dataclass
 class Config:
@@ -112,3 +117,4 @@ class Config:
     MULTIGRID: MultiGridConfig = field(default_factory=MultiGridConfig)
     TRAIN: TrainConfig = field(default_factory=TrainConfig)
     SOLVER: SolverConfig = field(default_factory=SolverConfig)
+    DATA_LOADER: DataLoaderConfig = field(default_factory=DataLoaderConfig)
