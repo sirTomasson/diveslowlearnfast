@@ -102,7 +102,7 @@ class SolverConfig:
 
 @dataclass
 class DataLoaderConfig:
-    NUM_WORKERS = 8
+    NUM_WORKERS = 2
     PIN_MEMORY = True
 
 @dataclass

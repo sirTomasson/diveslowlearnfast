@@ -4,6 +4,7 @@ import numpy as np
 
 from datetime import datetime
 
+
 from diveslowlearnfast.config import (
     merge_config,
     Config,
@@ -18,8 +19,15 @@ from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsa
 from pytorchvideo.transforms.functional import uniform_crop
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
-from torchvision.transforms.v2 import Lambda
 
+from diveslowlearnfast.transforms import CenterCropVideo, Permute, ToTensor4D
+
+
+def center_crop(images):
+    return uniform_crop(images, size=224, spatial_idx=1)
+
+def to_expected_shape(images):
+    return torch.tensor(images).permute(3, 0, 1, 2)
 
 def main():
     cfg = Config()
@@ -39,11 +47,12 @@ def main():
     )
 
     transform = Compose([
-        Lambda(lambda x: torch.tensor(x).permute(3, 0, 1, 2)),
+        ToTensor4D(),
+        Permute(3, 0, 1, 2),
         Div255(),  # Div255 assumes C x T x W x H
         ShortSideScale(size=256),
         # center crop
-        Lambda(lambda x: uniform_crop(x, size=224, spatial_idx=1)),
+        CenterCropVideo(size=224),
         UniformTemporalSubsample(32)
         # ensures each sample has the same number of frames, will under sample if T < 128, and over sample if T > 128
     ])
