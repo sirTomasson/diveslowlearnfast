@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from pathlib import Path
+
 
 @dataclass
 class ConfigData:
@@ -12,6 +14,8 @@ class ConfigData:
     )
     TRAIN_CROP_SIZE = 224
     TEST_CROP_SIZE = 256
+    ANNOTATIONS_PATH: Path = None,
+    VIDEOS_PATH: Path = None,
 
 @dataclass
 class SlowFastConfig:
@@ -83,6 +87,20 @@ class MultiGridConfig:
     SHORT_CYCLE: bool = False
 
 @dataclass
+class TrainConfig:
+    BATCH_SIZE: int = 4
+    PIN_MEMORY: bool = True
+
+class SolverConfig:
+    BASE_LR = 0.1
+    MAX_EPOCH = 196
+    MOMENTUM = 0.9
+    WEIGHT_DECAY = 1e-4
+    WARMUP_EPOCHS = 34.0
+    WARMUP_START_LR = 0.01
+    OPTIMIZING_METHOD = 'sgd'
+
+@dataclass
 class Config:
     DATA: ConfigData = field(default_factory=ConfigData)
     SLOWFAST: SlowFastConfig = field(default_factory=SlowFastConfig)
@@ -92,3 +110,5 @@ class Config:
     MODEL: ModelConfig = field(default_factory=ModelConfig)
     DETECTION: DetectionConfig = field(default_factory=DetectionConfig)
     MULTIGRID: MultiGridConfig = field(default_factory=MultiGridConfig)
+    TRAIN: TrainConfig = field(default_factory=TrainConfig)
+    SOLVER: SolverConfig = field(default_factory=SolverConfig)
