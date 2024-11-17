@@ -16,18 +16,21 @@ from diveslowlearnfast.models import SlowFast
 from diveslowlearnfast.train import train_epoch
 
 from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample
-from pytorchvideo.transforms.functional import uniform_crop
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
 from diveslowlearnfast.transforms import CenterCropVideo, Permute, ToTensor4D
 
+def print_device_props(device):
+    print(f'Running on {device}')
 
-def center_crop(images):
-    return uniform_crop(images, size=224, spatial_idx=1)
+    if device == torch.device('cpu'): return
 
-def to_expected_shape(images):
-    return torch.tensor(images).permute(3, 0, 1, 2)
+    device_props = torch.cuda.get_device_properties(torch.cuda.current_device())
+    print(f"Device: {device_props.name}")
+    print(f"Total memory: {device_props.total_memory / 1024 ** 2:.2f} MB")
+    print(f"GPU number: {device_props.major}.{device_props.minor}")
+
 
 def main():
     cfg = Config()
@@ -35,6 +38,7 @@ def main():
     cfg = merge_config(cfg, args)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print_device_props(device)
 
     model = SlowFast(cfg).to(device)
 
