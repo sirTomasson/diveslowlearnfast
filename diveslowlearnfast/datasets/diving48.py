@@ -13,6 +13,24 @@ from torchvision.transforms import Compose
 from torchvision.transforms.v2 import Lambda
 
 
+def load_video_av_optimized(video_path, num_frames):
+    """Efficiently load video frames using uniform sampling"""
+    container = av.open(video_path)
+    video_stream = container.streams.video[0]
+    total_frames = video_stream.frames
+
+    # Calculate timestamps for uniform sampling
+    indices = np.linspace(1, total_frames, num_frames, dtype=np.uint32)
+
+    frames = []
+    for idx, frame in enumerate(container.decode(video=0)):
+        if (idx+1) in indices:
+            frames.append(frame.to_ndarray(format='rgb24'))
+
+    container.close()
+    return np.stack(frames)
+
+
 def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
@@ -23,10 +41,11 @@ def collate_fn(batch):
 
 class Diving48Dataset(Dataset):
 
-    def __init__(self, videos_path, annotations_path, transform_fn=None, target_fps=None):
+    def __init__(self, videos_path, annotations_path, num_frames, transform_fn=None, target_fps=None):
         super().__init__()
         self.videos_path = videos_path
         self.annotations_path = annotations_path
+        self.num_frames = num_frames
         self.target_fps = target_fps
         self.transform_fn = transform_fn
         self._init_dataset()
@@ -38,24 +57,14 @@ class Diving48Dataset(Dataset):
     def _read_frames(self, video_id):
         start = time.time()
         video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
-        container = av.open(video_path)
 
-        video_stream = container.streams.video[0]
-
-        fps = video_stream.average_rate
-
-        frames = []
-        for frame in container.decode(video=0):
-            frames.append(frame.to_ndarray(format='rgb24'))
-
-        frames = np.stack(frames)
+        frames = load_video_av_optimized(video_path, self.num_frames)
         io_time = time.time() - start
 
         if self.transform_fn:
             start = time.time()
             frames = self.transform_fn(frames)
             transform_time = time.time() - start
-
 
         return frames, io_time, transform_time
 

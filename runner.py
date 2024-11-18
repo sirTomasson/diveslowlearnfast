@@ -57,13 +57,14 @@ def main():
         ShortSideScale(size=256),
         # center crop
         CenterCropVideo(size=224),
-        UniformTemporalSubsample(32)
+        # UniformTemporalSubsample(32)
         # ensures each sample has the same number of frames, will under sample if T < 128, and over sample if T > 128
     ])
 
     dataset = Diving48Dataset(
         cfg.DATA.VIDEOS_PATH,
         cfg.DATA.ANNOTATIONS_PATH,
+        cfg.DATA.NUM_FRAMES,
         transform_fn=transform,
     )
 
