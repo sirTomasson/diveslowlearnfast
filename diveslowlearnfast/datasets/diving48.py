@@ -1,9 +1,11 @@
 import json
 import av
 import os
+import time
+import torch
 
 import numpy as np
-import torch
+
 from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample
 from pytorchvideo.transforms.functional import uniform_crop
 from torch.utils.data import Dataset, DataLoader
@@ -33,8 +35,8 @@ class Diving48Dataset(Dataset):
         with open(self.annotations_path, 'rb') as f:
             self.data = json.loads(f.read())
 
-
     def _read_frames(self, video_id):
+        start = time.time()
         video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
         container = av.open(video_path)
 
@@ -47,15 +49,21 @@ class Diving48Dataset(Dataset):
             frames.append(frame.to_ndarray(format='rgb24'))
 
         frames = np.stack(frames)
-        if self.transform_fn:
-            frames = self.transform_fn(frames)
+        io_time = time.time() - start
 
-        return frames
+        if self.transform_fn:
+            start = time.time()
+            frames = self.transform_fn(frames)
+            transform_time = time.time() - start
+
+
+        return frames, io_time, transform_time
 
     def __getitem__(self, index):
         video_id = self.data[index]['vid_name']
         label = self.data[index]['label']
-        return self._read_frames(video_id), label
+        frames, io_time, transform_time = self._read_frames(video_id)
+        return frames, label, io_time, transform_time
 
 
     def __len__(self):

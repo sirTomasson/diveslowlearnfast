@@ -23,7 +23,7 @@ def train_epoch(model: nn.Module,
     batch_bar = tqdm(range(len(loader)), desc=f'Train batch')
     for _ in batch_bar:
         start_time = time.time()
-        xb, yb = next(loader_iter)
+        xb, yb, io_times, transform_times = next(loader_iter)
         loader_times.append(time.time() - start_time)
 
         start_time = time.time()
@@ -41,7 +41,10 @@ def train_epoch(model: nn.Module,
 
         avg_loader_time = np.mean(loader_times)
         avg_batch_time = np.mean(batch_times)
-        batch_bar.set_postfix({
+        postfix = {
             'avg_loader_time': f'{avg_loader_time:.2f}s',
-            'avg_batch_time': f'{avg_batch_time:.2f}s'
-        })
+            'avg_batch_time': f'{avg_batch_time:.2f}s',
+            'avg_io_time': f'{io_times.numpy().mean():.2f}s',
+            'avg_transform_time': f'{transform_times.numpy().mean():.2f}s',
+        }
+        batch_bar.set_postfix(postfix)
