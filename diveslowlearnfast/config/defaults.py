@@ -17,6 +17,8 @@ class ConfigData:
     ANNOTATIONS_PATH: Path = None,
     VIDEOS_PATH: Path = None,
     VOCAB_PATH: Path = None,
+    MEAN: list[float] = field(default_factory=lambda: [.5, .5, .5])
+    STD: list[float] = field(default_factory=lambda: [.5, .5, .5])
 
 @dataclass
 class SlowFastConfig:

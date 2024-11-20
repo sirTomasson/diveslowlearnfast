@@ -1,9 +1,6 @@
 import torch
 
-import numpy as np
-
-from datetime import datetime
-
+from tqdm import tqdm
 
 from diveslowlearnfast.config import (
     merge_config,
@@ -15,7 +12,7 @@ from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast
 from diveslowlearnfast.train import train_epoch
 
-from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample
+from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample, Normalize
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
@@ -59,6 +56,7 @@ def main():
         CenterCropVideo(size=224),
         # UniformTemporalSubsample(32)
         # ensures each sample has the same number of frames, will under sample if T < 128, and over sample if T > 128
+        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
     ])
 
     dataset = Diving48Dataset(
@@ -78,10 +76,11 @@ def main():
         shuffle=True,
     )
 
-    epoch_times = []
+    epoch_bar = tqdm(range(cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in range(cfg.SOLVER.MAX_EPOCH):
-        start = datetime.now()
-        train_epoch(
+        # print an empty line here otherwise tqdm will overwrite the epoch_bar
+        print('')
+        acc, loss = train_epoch(
             model,
             criterion,
             optimiser,
@@ -89,9 +88,10 @@ def main():
             device,
             cfg
         )
-        epoch_times.append((datetime.now() - start).seconds)
-        mean_time = np.mean(epoch_times)
-        print(f'Epoch {epoch + 1}/{cfg.SOLVER.MAX_EPOCH} - took {epoch_times[-1]:.3f} s, average time {mean_time:.3f} s')
+        epoch_bar.set_postfix({
+            'acc': f'{acc:.3f}',
+            'loss': f'{loss:.3f}'
+        })
 
 
 if __name__ == '__main__':
