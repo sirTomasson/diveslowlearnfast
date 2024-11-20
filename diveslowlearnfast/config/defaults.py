@@ -16,6 +16,7 @@ class ConfigData:
     TEST_CROP_SIZE = 256
     ANNOTATIONS_PATH: Path = None,
     VIDEOS_PATH: Path = None,
+    VOCAB_PATH: Path = None,
 
 @dataclass
 class SlowFastConfig:

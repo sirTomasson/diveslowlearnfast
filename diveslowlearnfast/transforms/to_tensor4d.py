@@ -4,8 +4,9 @@ from torchvision.transforms.v2 import Transform
 
 class ToTensor4D(Transform):
 
-    def __init__(self):
+    def __init__(self, dtype=None):
         super().__init__()
+        self.dtype = dtype if dtype is not None else torch.float32
 
     def __call__(self, x):
-        return torch.tensor(x)
+        return torch.tensor(x, dtype=self.dtype)

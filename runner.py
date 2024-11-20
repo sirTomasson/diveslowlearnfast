@@ -64,6 +64,7 @@ def main():
     dataset = Diving48Dataset(
         cfg.DATA.VIDEOS_PATH,
         cfg.DATA.ANNOTATIONS_PATH,
+        cfg.DATA.VOCAB_PATH,
         cfg.DATA.NUM_FRAMES,
         transform_fn=transform,
     )

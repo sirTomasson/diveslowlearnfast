@@ -23,6 +23,11 @@ def parse_args():
     )
 
     parser.add_argument(
+        'data.vocab_path',
+        help='Path to the vocabulary file'
+    )
+
+    parser.add_argument(
         'data.videos_path',
         help='Path to the video files'
     )
