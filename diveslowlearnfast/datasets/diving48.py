@@ -17,8 +17,8 @@ def decord_load_video(video_path, num_frames):
     from decord import cpu
 
     vr = decord.VideoReader(video_path, ctx=cpu(0))
-
-    indices = np.linspace(1, len(vr), num_frames, dtype=np.uint32)
+    num_frames = num_frames if num_frames <= len(vr) else len(vr)
+    indices = np.linspace(0, len(vr)-1, num_frames, dtype=np.uint32)
     frames = vr.get_batch(indices)
     return frames.asnumpy()
 
