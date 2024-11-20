@@ -32,6 +32,19 @@ def parse_args():
         help='Path to the video files'
     )
 
+    parser.add_argument(
+        '--data_loader.use_decord',
+        action='store_true',
+        help='Use decord package for efficient video loading. Warning! unavailable on OSX.'
+    )
+
+    parser.add_argument(
+        '--data_loader.num_workers',
+        type=int,
+        help='Number of workers used for data loading'
+    )
+
+
     args = parser.parse_args()
     nested_dict = {}
     for arg, value in vars(args).items():

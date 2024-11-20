@@ -12,6 +12,16 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import Compose
 from torchvision.transforms.v2 import Lambda
 
+def decord_load_video(video_path, num_frames):
+    import decord
+    from decord import cpu
+
+    vr = decord.VideoReader(video_path, ctx=cpu(0))
+    indices = np.linspace(1, len(vr), num_frames, dtype=np.uint32)
+    frames = vr.get_batch(indices)
+    return frames.asnumpy()
+
+
 def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
@@ -39,7 +49,7 @@ def collate_fn(batch):
 
 class Diving48Dataset(Dataset):
 
-    def __init__(self, videos_path, annotations_path, vocab_path, num_frames, transform_fn=None, target_fps=None):
+    def __init__(self, videos_path, annotations_path, vocab_path, num_frames, transform_fn=None, target_fps=None, use_decord=False):
         super().__init__()
         self.videos_path = videos_path
         self.annotations_path = annotations_path
@@ -47,6 +57,7 @@ class Diving48Dataset(Dataset):
         self.target_fps = target_fps
         self.transform_fn = transform_fn
         self.vocab_path = vocab_path
+        self.load_video = decord_load_video if use_decord else load_video_av_optimized
         self._init_dataset()
 
     def _init_dataset(self):
@@ -60,7 +71,7 @@ class Diving48Dataset(Dataset):
         start = time.time()
         video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
 
-        frames = load_video_av_optimized(video_path, self.num_frames)
+        frames = self.load_video(video_path, self.num_frames)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:

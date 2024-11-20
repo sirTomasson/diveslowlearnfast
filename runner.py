@@ -67,6 +67,7 @@ def main():
         cfg.DATA.VOCAB_PATH,
         cfg.DATA.NUM_FRAMES,
         transform_fn=transform,
+        use_decord=cfg.DATA_LOADER.USE_DECORD
     )
 
     dataloader = DataLoader(
