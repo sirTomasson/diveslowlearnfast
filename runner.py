@@ -30,9 +30,7 @@ def print_device_props(device):
 
 
 def main():
-    cfg = Config()
-    args = parse_args()
-    cfg = merge_config(cfg, args)
+    cfg = parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print_device_props(device)

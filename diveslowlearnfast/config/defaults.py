@@ -7,13 +7,13 @@ class ConfigData:
     INPUT_CHANNEL_NUM: list[int] = field(
         default_factory=lambda: [3, 3]
     )
-    NUM_FRAMES = 32
-    SAMPLING_RATE = 2
+    NUM_FRAMES: int = 32
+    SAMPLING_RATE: int = 2
     TRAIN_JITTER_SCALES: list[int] = field(
         default_factory=lambda: [256, 320]
     )
-    TRAIN_CROP_SIZE = 224
-    TEST_CROP_SIZE = 256
+    TRAIN_CROP_SIZE: int = 224
+    TEST_CROP_SIZE: int = 256
     ANNOTATIONS_PATH: Path = None,
     VIDEOS_PATH: Path = None,
     VOCAB_PATH: Path = None,
@@ -22,10 +22,10 @@ class ConfigData:
 
 @dataclass
 class SlowFastConfig:
-    ALPHA = 8
-    BETA_INV = 8
-    FUSION_CONV_CHANNEL_RATIO = 2
-    FUSION_KERNEL_SZ = 7
+    ALPHA: int = 8
+    BETA_INV: int = 8
+    FUSION_CONV_CHANNEL_RATIO: int = 2
+    FUSION_KERNEL_SZ: int = 7
 
 @dataclass
 class ResNetConfig:
@@ -93,21 +93,22 @@ class MultiGridConfig:
 class TrainConfig:
     BATCH_SIZE: int = 4
 
+@dataclass
 class SolverConfig:
-    BASE_LR = 0.1
-    MAX_EPOCH = 196
-    MOMENTUM = 0.9
-    WEIGHT_DECAY = 1e-4
-    WARMUP_EPOCHS = 34.0
-    WARMUP_START_LR = 0.01
-    OPTIMIZING_METHOD = 'sgd'
+    BASE_LR: int = 0.1
+    MAX_EPOCH: int = 196
+    MOMENTUM: int = 0.9
+    WEIGHT_DECAY: int = 1e-4
+    WARMUP_EPOCHS: int = 34.0
+    WARMUP_START_LR: int = 0.01
+    OPTIMIZING_METHOD: str = 'sgd'
 
 
 @dataclass
 class DataLoaderConfig:
-    NUM_WORKERS = 8
-    PIN_MEMORY = True
-    USE_DECORD = False
+    NUM_WORKERS: int = 8
+    PIN_MEMORY: bool = True
+    USE_DECORD: bool = False
 
 @dataclass
 class Config:
