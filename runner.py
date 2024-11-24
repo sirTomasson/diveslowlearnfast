@@ -2,15 +2,10 @@ import torch
 
 from tqdm import tqdm
 
-from diveslowlearnfast.config import (
-    merge_config,
-    Config,
-    parse_args
-)
-
+from diveslowlearnfast.config import parse_args
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast
-from diveslowlearnfast.train import train_epoch
+from diveslowlearnfast.train import train_epoch, run_warmup
 
 from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample, Normalize
 from torch.utils.data import DataLoader
@@ -73,6 +68,8 @@ def main():
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         shuffle=True,
     )
+
+    run_warmup(model, optimiser, criterion, dataloader, device, cfg)
 
     epoch_bar = tqdm(range(cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in range(cfg.SOLVER.MAX_EPOCH):

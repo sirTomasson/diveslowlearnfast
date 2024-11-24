@@ -99,7 +99,7 @@ class SolverConfig:
     MAX_EPOCH: int = 196
     MOMENTUM: int = 0.9
     WEIGHT_DECAY: int = 1e-4
-    WARMUP_EPOCHS: int = 34.0
+    WARMUP_EPOCHS: int = 34
     WARMUP_START_LR: int = 0.01
     OPTIMIZING_METHOD: str = 'sgd'
 
