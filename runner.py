@@ -9,7 +9,7 @@ from diveslowlearnfast.config import parse_args, save_config, to_dict
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
 from diveslowlearnfast.models.utils import last_checkpoint
-from diveslowlearnfast.train import train_epoch, run_warmup
+from diveslowlearnfast.train import train_epoch, run_warmup, save_stats, load_stats
 
 from pytorchvideo.transforms import ShortSideScale, Div255, Normalize
 from torch.utils.data import DataLoader
@@ -97,6 +97,7 @@ def main():
     if checkpoint_path is None:
         run_warmup(model, optimiser, criterion, dataloader, device, cfg)
 
+    stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
         acc, loss = train_epoch(
@@ -111,6 +112,10 @@ def main():
             'acc': f'{acc:.3f}',
             'loss': f'{loss:.3f}'
         })
+
+        stats['train_losses'].append(loss)
+        stats['train_accuracies'].append(acc)
+        save_stats(stats, cfg.TRAIN.RESULT_DIR)
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
             save_checkpoint(model,
