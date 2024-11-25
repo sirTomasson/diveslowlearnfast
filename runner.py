@@ -72,9 +72,7 @@ def main():
     run_warmup(model, optimiser, criterion, dataloader, device, cfg)
 
     epoch_bar = tqdm(range(cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
-    for epoch in range(cfg.SOLVER.MAX_EPOCH):
-        # print an empty line here otherwise tqdm will overwrite the epoch_bar
-        print('')
+    for _ in epoch_bar:
         acc, loss = train_epoch(
             model,
             criterion,
@@ -87,6 +85,8 @@ def main():
             'acc': f'{acc:.3f}',
             'loss': f'{loss:.3f}'
         })
+        print('\n')
+        print(10 * '_')
 
 
 if __name__ == '__main__':

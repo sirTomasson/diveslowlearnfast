@@ -10,10 +10,11 @@ from diveslowlearnfast.config import Config
 def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
     warmup_epochs = cfg.SOLVER.WARMUP_EPOCHS
     lr_schedule = np.linspace(cfg.SOLVER.WARMUP_START_LR, cfg.SOLVER.BASE_LR, warmup_epochs)
-    warmup_bar = tqdm(enumerate(islice(cycle(dataloader), warmup_epochs)))
+    warmup_bar = tqdm(range(warmup_epochs))
+    dataloader_iter = islice(cycle(dataloader), warmup_epochs)
     warmup_bar.set_description("Warming up")
-    for i, batch in warmup_bar:
-        xb, yb = batch[0], batch[1]
+    for i in warmup_bar:
+        xb, yb, *_ = next(dataloader_iter)
         lr = lr_schedule[i]
         warmup_bar.set_postfix({ 'lr': lr })
 

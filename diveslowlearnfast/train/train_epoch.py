@@ -58,5 +58,4 @@ def train_epoch(model: nn.Module,
         }
         batch_bar.set_postfix(postfix)
 
-
     return running_acc, running_loss
