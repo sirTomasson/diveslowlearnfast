@@ -50,14 +50,20 @@ def collate_fn(batch):
 
 class Diving48Dataset(Dataset):
 
-    def __init__(self, videos_path, annotations_path, vocab_path, num_frames, transform_fn=None, target_fps=None, use_decord=False):
+    def __init__(self, dataset_path, num_frames,
+                 dataset_type='train',
+                 dataset_version='V2',
+                 transform_fn=None,
+                 target_fps=None,
+                 use_decord=False):
         super().__init__()
-        self.videos_path = videos_path
-        self.annotations_path = annotations_path
+        assert dataset_type in ['train', 'test']
+        self.videos_path = os.path.join(dataset_path, 'rgb')
+        self.annotations_path = os.path.join(dataset_path, f'Diving48_{dataset_version}_{dataset_type}.json')
+        self.vocab_path = os.path.join(dataset_path, f'Diving48_vocab.json')
         self.num_frames = num_frames
         self.target_fps = target_fps
         self.transform_fn = transform_fn
-        self.vocab_path = vocab_path
         self.load_video = decord_load_video if use_decord else load_video_av_optimized
         self._init_dataset()
 
@@ -106,20 +112,18 @@ class Diving48Dataset(Dataset):
 
 import unittest
 
-VIDEOS_PATH = os.environ.get('VIDEOS_PATH')
-ANNOTATIONS_PATH = os.environ.get('ANNOTATIONS_PATH')
-VOCAB_PATH = os.environ.get('VOCAB_PATH')
+DATASET_PATH = os.environ.get('DATASET_PATH')
 
 class Diving48DatasetTest(unittest.TestCase):
 
     def test_init(self):
-        diving48 = Diving48Dataset(VIDEOS_PATH, ANNOTATIONS_PATH, VOCAB_PATH, num_frames=4)
-        self.assertEqual(diving48.videos_path, VIDEOS_PATH)
-        self.assertEqual(diving48.annotations_path, ANNOTATIONS_PATH)
+        diving48 = Diving48Dataset(DATASET_PATH, num_frames=4)
+        self.assertEqual(diving48.videos_path, os.path.join(DATASET_PATH, 'rgb'))
+        self.assertEqual(diving48.annotations_path, os.path.join(DATASET_PATH, 'Diving48_V2_train.json'))
         self.assertEqual(diving48.target_fps, None)
 
     def test_get_item(self):
-        diving48 = Diving48Dataset(VIDEOS_PATH, ANNOTATIONS_PATH, VOCAB_PATH, num_frames=4)
+        diving48 = Diving48Dataset(DATASET_PATH,num_frames=4)
         diving48_iter = iter(diving48)
         video, label, *_ = next(diving48_iter)
         self.assertIsNotNone(label)
@@ -133,7 +137,7 @@ class Diving48DatasetTest(unittest.TestCase):
             ShortSideScale(size=256),
             Lambda(lambda x: uniform_crop(x, size=224, spatial_idx=1)),
         ])
-        diving48 = Diving48Dataset(VIDEOS_PATH, ANNOTATIONS_PATH, VOCAB_PATH, num_frames=4, transform_fn=transform)
+        diving48 = Diving48Dataset(DATASET_PATH, num_frames=4, transform_fn=transform)
         x, *_ = next(iter(diving48))
         # assert dims equal to 3 x T x 224 x 224
         self.assertEqual(x.shape[0], 3)
@@ -147,7 +151,7 @@ class Diving48DatasetTest(unittest.TestCase):
             Lambda(lambda x: uniform_crop(x, size=224, spatial_idx=1)),
             UniformTemporalSubsample(128) # ensures each sample has the same number of frames, will under sample if T < 128, and over sample if T > 128
         ])
-        diving48 = Diving48Dataset(VIDEOS_PATH, ANNOTATIONS_PATH, VOCAB_PATH, num_frames=2, transform_fn=transform)
+        diving48 = Diving48Dataset(DATASET_PATH, num_frames=2, transform_fn=transform)
         diving48_dataloader = DataLoader(diving48, batch_size=4, shuffle=True)
         diving48_iter = iter(diving48_dataloader)
         x, y, *_ = next(diving48_iter)
@@ -176,7 +180,7 @@ class Diving48DatasetTest(unittest.TestCase):
         self.assertEqual(xb_padded.shape, (4, 128, 24, 24, 3))
 
     def test_get_label(self):
-        diving48 = Diving48Dataset(VIDEOS_PATH, ANNOTATIONS_PATH, VOCAB_PATH, num_frames=4)
+        diving48 = Diving48Dataset(DATASET_PATH, num_frames=4)
         self.assertIsNotNone(diving48.get_label(0))
         self.assertIsNotNone(diving48.get_label(47))
         self.assertIsNotNone(len(diving48.vocab), 48)

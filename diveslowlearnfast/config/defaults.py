@@ -14,9 +14,7 @@ class ConfigData:
     )
     TRAIN_CROP_SIZE: int = 224
     TEST_CROP_SIZE: int = 256
-    ANNOTATIONS_PATH: Path = None,
-    VIDEOS_PATH: Path = None,
-    VOCAB_PATH: Path = None,
+    DATASET_PATH: Path = None,
     MEAN: list[float] = field(default_factory=lambda: [.5, .5, .5])
     STD: list[float] = field(default_factory=lambda: [.5, .5, .5])
 
@@ -93,6 +91,7 @@ class MultiGridConfig:
 class TrainConfig:
     BATCH_SIZE: int = 4
     CHECKPOINT_PERIOD: int = 10
+    EVAL_PERIOD: int = 10
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
 

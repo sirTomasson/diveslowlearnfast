@@ -36,18 +36,8 @@ def parse_args() -> Config:
     )
 
     parser.add_argument(
-        'DATA.ANNOTATIONS_PATH',
-        help='Path to the annotations file'
-    )
-
-    parser.add_argument(
-        'DATA.VOCAB_PATH',
-        help='Path to the vocabulary file'
-    )
-
-    parser.add_argument(
-        'DATA.VIDEOS_PATH',
-        help='Path to the video files'
+        'DATA.DATASET_PATH',
+        help='Path to the dataset root file. Should contain and rgb/ folder annotation files for the test and train set, and a vocabulary file.'
     )
 
     include_config_in_parser(Config(), parser)
@@ -69,7 +59,7 @@ def parse_args() -> Config:
 class ParseArgsTest(unittest.TestCase):
 
     def test_parse_args(self):
-        args = parse_args('xyz', 'abc', 'foo',
+        args = parse_args('xyz',
                           '--DATA_LOADER.PIN_MEMORY',
                           '--DATA_LOADER.NUM_WORKERS', '2')
         self.assertEqual(args.DATA.ANNOTATIONS_PATH, 'xyz')
