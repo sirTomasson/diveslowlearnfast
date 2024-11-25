@@ -10,19 +10,19 @@ from tqdm import tqdm
 from diveslowlearnfast.config import Config
 
 
-def train_epoch(model: nn.Module,
-                criterion: nn.Module,
-                optimiser: torch.optim.Optimizer,
-                loader: DataLoader,
-                device,
-                cfg: Config):
+@torch.no_grad()
+def run_test_epoch(model: nn.Module,
+              criterion: nn.Module,
+              loader: DataLoader,
+              device,
+              cfg: Config):
 
     loader_times = []
     batch_times = []
     loader_iter = iter(loader)
-    batch_bar = tqdm(range(len(loader)), desc=f'Train batch')
-    running_acc = None
-    running_loss = None
+    batch_bar = tqdm(range(len(loader)), desc='Test batch')
+    accuracies = []
+    lossses = []
     for _ in batch_bar:
         start_time = time.time()
         xb, yb, io_times, transform_times = next(loader_iter)
@@ -35,15 +35,13 @@ def train_epoch(model: nn.Module,
         # B x C x T / alpha x H x W
         xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
 
-        optimiser.zero_grad()
         o = model([xb_slow, xb_fast])
         loss = criterion(o, yb)
-        loss.backward()
         ypred = o.argmax(dim=-1)
         correct = (yb == ypred).cpu().detach().numpy().sum()
         acc = correct / len(yb)
-        running_acc = acc if running_acc is None else (running_acc + acc) / 2
-        running_loss = acc if running_loss is None else (running_loss + loss.item()) / 2
+        accuracies.append(acc)
+        lossses.append(loss.item())
         batch_times.append(time.time() - start_time)
 
         avg_loader_time = np.mean(loader_times)
@@ -58,4 +56,4 @@ def train_epoch(model: nn.Module,
         }
         batch_bar.set_postfix(postfix)
 
-    return running_acc, running_loss
+    return np.mean(accuracies), np.mean(lossses)

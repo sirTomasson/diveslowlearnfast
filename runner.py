@@ -9,13 +9,14 @@ from diveslowlearnfast.config import parse_args, save_config, to_dict
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
 from diveslowlearnfast.models.utils import last_checkpoint
-from diveslowlearnfast.train import train_epoch, run_warmup, save_stats, load_stats
+from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch
 
 from pytorchvideo.transforms import ShortSideScale, Div255, Normalize
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
 from diveslowlearnfast.transforms import CenterCropVideo, Permute, ToTensor4D
+
 
 def print_device_props(device):
     print(f'Running on {device}')
@@ -78,7 +79,7 @@ def main():
         use_decord=cfg.DATA_LOADER.USE_DECORD
     )
 
-    dataloader = DataLoader(
+    train_loader = DataLoader(
         train_dataset,
         batch_size=cfg.TRAIN.BATCH_SIZE,
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
@@ -94,28 +95,32 @@ def main():
         use_decord=cfg.DATA_LOADER.USE_DECORD
     )
 
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=cfg.TRAIN.BATCH_SIZE,
+        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+        shuffle=False,
+    )
+
     if checkpoint_path is None:
-        run_warmup(model, optimiser, criterion, dataloader, device, cfg)
+        run_warmup(model, optimiser, criterion, train_loader, device, cfg)
 
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
-        acc, loss = train_epoch(
+        train_acc, train_loss = run_train_epoch(
             model,
             criterion,
             optimiser,
-            dataloader,
+            train_loader,
             device,
-            cfg
+            cfg,
         )
         epoch_bar.set_postfix({
-            'acc': f'{acc:.3f}',
-            'loss': f'{loss:.3f}'
+            'acc': f'{train_acc:.3f}',
+            'train_loss': f'{train_loss:.3f}'
         })
-
-        stats['train_losses'].append(loss)
-        stats['train_accuracies'].append(acc)
-        save_stats(stats, cfg.TRAIN.RESULT_DIR)
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
             save_checkpoint(model,
@@ -123,7 +128,21 @@ def main():
                             epoch,
                             cfg.TRAIN.RESULT_DIR)
 
-        # if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
+        stats['train_losses'].append(train_loss)
+        stats['train_accuracies'].append(train_acc)
+
+        if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
+            test_acc, test_loss = run_test_epoch(
+                model,
+                criterion,
+                test_loader,
+                device,
+                cfg,
+            )
+            stats['test_losses'].append(test_acc)
+            stats['test_accuracies'].append(test_loss)
+
+        save_stats(stats, cfg.TRAIN.RESULT_DIR)
 
         print('\n')
         print(10 * '_')
