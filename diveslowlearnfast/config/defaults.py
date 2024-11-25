@@ -92,6 +92,9 @@ class MultiGridConfig:
 @dataclass
 class TrainConfig:
     BATCH_SIZE: int = 4
+    CHECKPOINT_PERIOD: int = 10
+    AUTO_RESUME: bool = True
+    RESULT_DIR: Path = Path('results')
 
 @dataclass
 class SolverConfig:

@@ -4,10 +4,11 @@ from tqdm import tqdm
 
 from diveslowlearnfast.config import parse_args
 from diveslowlearnfast.datasets import Diving48Dataset
-from diveslowlearnfast.models import SlowFast
+from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
+from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import train_epoch, run_warmup
 
-from pytorchvideo.transforms import ShortSideScale, Div255, UniformTemporalSubsample, Normalize
+from pytorchvideo.transforms import ShortSideScale, Div255, Normalize
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
@@ -40,6 +41,17 @@ def main():
         weight_decay=cfg.SOLVER.WEIGHT_DECAY,
     )
 
+    start_epoch = 1
+    checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
+    if cfg.TRAIN.AUTO_RESUME and checkpoint_path is not None:
+        model, optimiser, epoch = load_checkpoint(
+            model,
+            optimiser,
+            checkpoint_path,
+            device
+        )
+        start_epoch = epoch + 1
+
     transform = Compose([
         ToTensor4D(),
         Permute(3, 0, 1, 2),
@@ -69,10 +81,11 @@ def main():
         shuffle=True,
     )
 
-    run_warmup(model, optimiser, criterion, dataloader, device, cfg)
+    if checkpoint_path is None:
+        run_warmup(model, optimiser, criterion, dataloader, device, cfg)
 
-    epoch_bar = tqdm(range(cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
-    for _ in epoch_bar:
+    epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
+    for epoch in epoch_bar:
         acc, loss = train_epoch(
             model,
             criterion,
@@ -82,9 +95,16 @@ def main():
             cfg
         )
         epoch_bar.set_postfix({
-            'acc': f'{acc:.3f}',
-            'loss': f'{loss:.3f}'
+            # 'acc': f'{acc:.3f}',
+            # 'loss': f'{loss:.3f}'
         })
+
+        if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
+            save_checkpoint(model,
+                            optimiser,
+                            epoch,
+                            cfg.TRAIN.RESULT_DIR)
+
         print('\n')
         print(10 * '_')
 
