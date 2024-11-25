@@ -1,8 +1,10 @@
+import os.path
+
 import torch
 
 from tqdm import tqdm
 
-from diveslowlearnfast.config import parse_args
+from diveslowlearnfast.config import parse_args, save_config
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
 from diveslowlearnfast.models.utils import last_checkpoint
@@ -27,6 +29,7 @@ def print_device_props(device):
 
 def main():
     cfg = parse_args()
+    save_config(cfg, os.path.join(cfg.TRAIN.RESULT_DIR, 'config.json'))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print_device_props(device)
