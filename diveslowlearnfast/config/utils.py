@@ -1,11 +1,6 @@
 import json
 from argparse import Namespace
-from dataclasses import is_dataclass
 from pathlib import Path
-
-from diveslowlearnfast.config import Config
-
-import copy
 
 def to_dict(value):
     cfg_dict = value.__dict__
@@ -19,9 +14,6 @@ def to_dict(value):
 
     return cfg_dict
 
-def save_config(cfg: Config, path):
-    cfg = copy.deepcopy(cfg)
-    cfg_dict = to_dict(cfg)
-    print(cfg_dict)
+def save_config(cfg, path):
     with open(path, 'w') as f:
-        json.dump(cfg_dict, f, indent=2)
+        json.dump(cfg, f, indent=2)

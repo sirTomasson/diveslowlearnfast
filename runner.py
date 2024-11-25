@@ -1,10 +1,11 @@
+import copy
 import os.path
 
 import torch
 
 from tqdm import tqdm
 
-from diveslowlearnfast.config import parse_args, save_config
+from diveslowlearnfast.config import parse_args, save_config, to_dict
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
 from diveslowlearnfast.models.utils import last_checkpoint
@@ -29,7 +30,9 @@ def print_device_props(device):
 
 def main():
     cfg = parse_args()
-    save_config(cfg, os.path.join(cfg.TRAIN.RESULT_DIR, 'config.json'))
+    dict_cfg = to_dict(copy.deepcopy(cfg))
+    print(dict_cfg)
+    save_config(dict_cfg, os.path.join(cfg.TRAIN.RESULT_DIR, 'config.json'))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print_device_props(device)
@@ -98,8 +101,8 @@ def main():
             cfg
         )
         epoch_bar.set_postfix({
-            # 'acc': f'{acc:.3f}',
-            # 'loss': f'{loss:.3f}'
+            'acc': f'{acc:.3f}',
+            'loss': f'{loss:.3f}'
         })
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
