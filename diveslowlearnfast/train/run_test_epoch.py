@@ -22,7 +22,7 @@ def run_test_epoch(model: nn.Module,
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Test batch')
     accuracies = []
-    lossses = []
+    losses = []
     for _ in batch_bar:
         start_time = time.time()
         xb, yb, io_times, transform_times = next(loader_iter)
@@ -41,7 +41,7 @@ def run_test_epoch(model: nn.Module,
         correct = (yb == ypred).cpu().detach().numpy().sum()
         acc = correct / len(yb)
         accuracies.append(acc)
-        lossses.append(loss.item())
+        losses.append(loss.item())
         batch_times.append(time.time() - start_time)
 
         avg_loader_time = np.mean(loader_times)
@@ -56,4 +56,4 @@ def run_test_epoch(model: nn.Module,
         }
         batch_bar.set_postfix(postfix)
 
-    return np.mean(accuracies), np.mean(lossses)
+    return np.mean(accuracies), np.mean(losses)
