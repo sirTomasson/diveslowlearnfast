@@ -32,6 +32,7 @@ def load_video_av_optimized(video_path, num_frames):
     container = av.open(video_path)
     video_stream = container.streams.video[0]
     total_frames = video_stream.frames
+    num_frames = total_frames if num_frames == -1 else num_frames
 
     # Calculate timestamps for uniform sampling
     indices = np.linspace(1, total_frames, num_frames, dtype=np.uint32)
