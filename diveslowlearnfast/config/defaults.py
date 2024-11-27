@@ -15,8 +15,8 @@ class ConfigData:
     TRAIN_CROP_SIZE: int = 224
     TEST_CROP_SIZE: int = 256
     DATASET_PATH: Path = None,
-    MEAN: list[float] = field(default_factory=lambda: [.5, .5, .5])
-    STD: list[float] = field(default_factory=lambda: [.5, .5, .5])
+    MEAN: tuple[float, float, float] = field(default_factory=lambda: (.5, .5, .5))
+    STD: tuple[float, float, float] = field(default_factory=lambda: (.5, .5, .5))
 
 @dataclass
 class SlowFastConfig:
@@ -90,6 +90,7 @@ class MultiGridConfig:
 @dataclass
 class TrainConfig:
     BATCH_SIZE: int = 4
+    MACRO_BATCH_SIZE: int = 256
     CHECKPOINT_PERIOD: int = 10
     EVAL_PERIOD: int = 10
     AUTO_RESUME: bool = True

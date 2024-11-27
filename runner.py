@@ -1,6 +1,7 @@
 import copy
 import os.path
 
+import pytorchvideo.transforms
 import torch
 
 from tqdm import tqdm
@@ -11,11 +12,12 @@ from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint
 from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch
 
-from pytorchvideo.transforms import ShortSideScale, Div255, Normalize
+from pytorchvideo.transforms import Div255
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
-from diveslowlearnfast.transforms import CenterCropVideo, Permute, ToTensor4D
+from diveslowlearnfast.transforms import Permute, ToTensor4D
+from diveslowlearnfast.transforms.random_rotate_video import RandomRotateVideo
 
 
 def print_device_props(device):
@@ -59,23 +61,42 @@ def main():
         )
         start_epoch = epoch + 1
 
-    transform = Compose([
+    train_transform = Compose([
         ToTensor4D(),
         Permute(3, 0, 1, 2),
-        Div255(),  # Div255 assumes C x T x W x H
-        ShortSideScale(size=256),
-        # center crop
-        CenterCropVideo(size=224),
-        # UniformTemporalSubsample(32)
-        # ensures each sample has the same number of frames, will under sample if T < 128, and over sample if T > 128
-        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+        Div255(),
+        pytorchvideo.transforms.create_video_transform(
+            mode='train',
+            num_samples=cfg.DATA.NUM_FRAMES,
+            video_std=cfg.DATA.MEAN,
+            video_mean=cfg.DATA.STD,
+            convert_to_float=False,
+            crop_size=224,
+            horizontal_flip_prob=0.5,
+            random_resized_crop_paras={'scale': (1.0, 1.0), 'aspect_ratio': (1.0, 1.0)}
+        ),
+        RandomRotateVideo(-30, 30),
+    ])
+
+    test_transform = Compose([
+        ToTensor4D(),
+        Permute(3, 0, 1, 2),
+        Div255(),
+        pytorchvideo.transforms.create_video_transform(
+            mode='test',
+            num_samples=cfg.DATA.NUM_FRAMES,
+            video_std=cfg.DATA.MEAN,
+            video_mean=cfg.DATA.STD,
+            convert_to_float=False,
+            crop_size=224,
+        ),
     ])
 
     train_dataset = Diving48Dataset(
         cfg.DATA.DATASET_PATH,
         cfg.DATA.NUM_FRAMES,
         dataset_type='train',
-        transform_fn=transform,
+        transform_fn=train_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD
     )
 
@@ -91,7 +112,7 @@ def main():
         cfg.DATA.DATASET_PATH,
         cfg.DATA.NUM_FRAMES,
         dataset_type='test',
-        transform_fn=transform,
+        transform_fn=test_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD
     )
 
@@ -106,6 +127,7 @@ def main():
     if checkpoint_path is None:
         run_warmup(model, optimiser, criterion, train_loader, device, cfg)
 
+    model.train()
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
@@ -132,6 +154,7 @@ def main():
         stats['train_accuracies'].append(train_acc)
 
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
+            model.eval()
             test_acc, test_loss = run_test_epoch(
                 model,
                 criterion,
@@ -139,6 +162,7 @@ def main():
                 device,
                 cfg,
             )
+            model.train()
             stats['test_losses'].append(test_acc)
             stats['test_accuracies'].append(test_loss)
 

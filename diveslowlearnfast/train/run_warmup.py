@@ -28,4 +28,3 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
         o = model([xb_slow, xb_fast])
         loss = criterion(o, yb)
         loss.backward()
-
