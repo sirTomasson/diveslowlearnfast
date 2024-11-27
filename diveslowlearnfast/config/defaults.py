@@ -15,8 +15,8 @@ class ConfigData:
     TRAIN_CROP_SIZE: int = 224
     TEST_CROP_SIZE: int = 256
     DATASET_PATH: Path = None,
-    MEAN: tuple[float, float, float] = field(default_factory=lambda: (.5, .5, .5))
-    STD: tuple[float, float, float] = field(default_factory=lambda: (.5, .5, .5))
+    MEAN: tuple[float, float, float] = field(default_factory=lambda: (0.34820506, 0.46970264, 0.52824965))
+    STD: tuple[float, float, float] = field(default_factory=lambda: (0.19905839, 0.20019781, 0.23073433))
 
 @dataclass
 class SlowFastConfig:
