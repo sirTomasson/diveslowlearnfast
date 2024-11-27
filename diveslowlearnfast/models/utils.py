@@ -31,3 +31,6 @@ def last_checkpoint(save_dir: str | Path):
 
     checkpoints.sort()
     return checkpoints[-1]
+
+def get_parameter_count(model):
+    return sum(p.numel() for p in model.parameters())

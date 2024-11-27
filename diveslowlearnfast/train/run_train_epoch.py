@@ -2,12 +2,14 @@ import time
 import torch
 
 import numpy as np
+from networkx.algorithms.core import core_number
 
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.train.stats import Statistics
 
 
 def run_train_epoch(model: nn.Module,
@@ -16,13 +18,9 @@ def run_train_epoch(model: nn.Module,
                     loader: DataLoader,
                     device,
                     cfg: Config):
-
-    loader_times = []
-    batch_times = []
+    stats = Statistics()
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Train batch')
-    accuracies = []
-    losses = []
     n_macro_batches = cfg.TRAIN.MACRO_BATCH_SIZE // cfg.TRAIN.BATCH_SIZE
     loss = 0
     correct = 0
@@ -30,7 +28,7 @@ def run_train_epoch(model: nn.Module,
     for i in batch_bar:
         start_time = time.time()
         xb, yb, io_times, transform_times = next(loader_iter)
-        loader_times.append(time.time() - start_time)
+        stats.update(loader_time=(time.time() - start_time))
         start_time = time.time()
 
         yb = yb.to(device)
@@ -49,12 +47,10 @@ def run_train_epoch(model: nn.Module,
             ypred = o.argmax(dim=-1)
             correct += (yb == ypred).cpu().numpy().sum()
 
-        avg_loader_time = np.mean(loader_times)
-        postfix = {
-            'loader_time': f'{avg_loader_time:.3f}s',
-            'io_time': f'{io_times.numpy().mean():.3f}s',
-            'transform_time': f'{transform_times.numpy().mean():.3f}s',
-        }
+        stats.update(
+            io_time=np.mean(io_times.numpy()),
+            transform_time=np.mean(transform_times.numpy()),
+        )
 
         count += len(xb)
 
@@ -64,20 +60,23 @@ def run_train_epoch(model: nn.Module,
             optimiser.zero_grad()
 
             acc = correct / count
-            accuracies.append(acc)
             loss /= n_macro_batches
-            losses.append(loss)
-            postfix['loss'] = f'{loss:.3f}'
-            postfix['acc'] = f'{acc:.3f}'
+            stats.update(accuracy=acc, loss=loss)
             correct = 0
             count = 0
             loss = 0
 
+        stats.update(batch_time=(time.time() - start_time))
 
-        batch_times.append(time.time() - start_time)
-        avg_batch_time = np.mean(batch_times)
-        postfix['batch_time'] = f'{avg_batch_time:.3f}s'
-
+        postfix = stats.get_formatted_stats(
+            'current_batch_time',
+            'current_io_time',
+            'current_transform_time',
+            'current_loss',
+            'current_accuracy',
+        )
         batch_bar.set_postfix(postfix)
 
-    return np.mean(accuracies), np.mean(losses)
+    mean_accuracy = stats.mean_accuracy()
+    mean_loss = stats.mean_loss()
+    return mean_accuracy, mean_loss
