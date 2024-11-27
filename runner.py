@@ -124,9 +124,6 @@ def main():
         shuffle=False,
     )
 
-    if checkpoint_path is None:
-        run_warmup(model, optimiser, criterion, train_loader, device, cfg)
-
     print(f'Start training model:')
     parameter_count = get_parameter_count(model)
     print(f'parameter count = {parameter_count}')
@@ -134,6 +131,15 @@ def main():
     total_parameter_bytes = parameter_count * 12
     print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
     print(f'from checkpoint = {checkpoint_path}')
+
+    if checkpoint_path is None:
+        run_warmup(model, optimiser, criterion, train_loader, device, cfg)
+        optimiser = torch.optim.SGD(
+            model.parameters(),
+            lr=cfg.SOLVER.BASE_LR,
+            momentum=cfg.SOLVER.MOMENTUM,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+        )
 
     model.train()
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
