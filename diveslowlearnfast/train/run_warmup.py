@@ -16,6 +16,7 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
     for i in warmup_bar:
         xb, yb, *_ = next(dataloader_iter)
         lr = lr_schedule[i]
+        optimiser.param_groups[0]['lr'] = lr
         warmup_bar.set_postfix({ 'lr': lr })
 
         yb = yb.to(device)
