@@ -98,7 +98,8 @@ def main():
         dataset_type='train',
         transform_fn=train_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD,
-        temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER
+        temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
+        temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET
     )
 
     train_loader = DataLoader(
