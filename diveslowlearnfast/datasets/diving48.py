@@ -23,7 +23,7 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
     num_frames = num_frames if num_frames <= len(vr) else len(vr)
     indices = np.linspace(0, len(vr)-1, num_frames, dtype=np.uint32)
     indices = temporal_random_offset_indices(indices, len(vr)-1, temporal_random_offset)
-    indices = temporal_random_jitter_indices(indices, num_frames, len(vr)-1, temporal_random_jitter)
+    indices = temporal_random_jitter_indices(indices, len(vr)-1, num_frames, temporal_random_jitter)
     frames = vr.get_batch(indices)
     return frames.asnumpy()
 
