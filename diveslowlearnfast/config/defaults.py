@@ -17,6 +17,7 @@ class ConfigData:
     DATASET_PATH: Path = None,
     MEAN: tuple[float, float, float] = field(default_factory=lambda: (0.31, 0.47, 0.5))
     STD: tuple[float, float, float] = field(default_factory=lambda: (0.2, 0.2, 0.23))
+    TEMPORAL_RANDOM_JITTER: int = 0
 
 @dataclass
 class SlowFastConfig:

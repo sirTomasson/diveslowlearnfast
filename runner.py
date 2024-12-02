@@ -12,13 +12,11 @@ from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint,
 from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch
 
-from pytorchvideo.transforms import Div255
+from pytorchvideo.transforms import Div255, RandAugment
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 
 from diveslowlearnfast.transforms import Permute, ToTensor4D
-from diveslowlearnfast.transforms.random_rotate_video import RandomRotateVideo
-
 
 def print_device_props(device):
     print(f'Running on {device}')
@@ -63,7 +61,7 @@ def main():
 
     train_transform = Compose([
         ToTensor4D(),
-        Permute(3, 0, 1, 2),
+        Permute(3, 0, 1, 2), # From T x H X W x 3 -> 3 x T x H x W
         Div255(),
         pytorchvideo.transforms.create_video_transform(
             mode='train',
@@ -75,7 +73,9 @@ def main():
             horizontal_flip_prob=0.5,
             random_resized_crop_paras={'scale': (1.0, 1.0), 'aspect_ratio': (1.0, 1.0)}
         ),
-        RandomRotateVideo(-30, 30),
+        Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W
+        RandAugment(prob=0.5, sampling_type='gaussian'),
+        Permute(1, 0, 2, 3), # From T x 3 x H X W -> 3 x T x H x W
     ])
 
     test_transform = Compose([
@@ -97,7 +97,8 @@ def main():
         cfg.DATA.NUM_FRAMES,
         dataset_type='train',
         transform_fn=train_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD
+        use_decord=cfg.DATA_LOADER.USE_DECORD,
+        temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER
     )
 
     train_loader = DataLoader(

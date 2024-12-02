@@ -12,13 +12,14 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import Compose
 from torchvision.transforms.v2 import Lambda
 
-def decord_load_video(video_path, num_frames):
+def decord_load_video(video_path, num_frames, temporal_random_jitter=0):
     import decord
     from decord import cpu
 
     vr = decord.VideoReader(video_path, ctx=cpu(0))
     num_frames = num_frames if num_frames <= len(vr) else len(vr)
     indices = np.linspace(0, len(vr)-1, num_frames, dtype=np.uint32)
+    indices = temporal_random_jitter_indices(indices, num_frames, len(vr)-1, temporal_random_jitter)
     frames = vr.get_batch(indices)
     return frames.asnumpy()
 
@@ -27,7 +28,12 @@ def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
 
-def load_video_av_optimized(video_path, num_frames):
+def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter=0):
+    jitter = np.random.randint(-temporal_random_jitter, temporal_random_jitter+1, size=num_frames)
+    clipped = np.clip(indices + jitter, 0, total_frames)
+    return np.sort(clipped)
+
+def load_video_av_optimized(video_path, num_frames, temporal_random_jitter=0):
     """Efficiently load video frames using uniform sampling"""
     container = av.open(video_path)
     video_stream = container.streams.video[0]
@@ -35,12 +41,14 @@ def load_video_av_optimized(video_path, num_frames):
     num_frames = total_frames if num_frames == -1 else num_frames
 
     # Calculate timestamps for uniform sampling
-    indices = np.linspace(1, total_frames, num_frames, dtype=np.uint32)
-
+    indices = np.linspace(0, total_frames-1, num_frames, dtype=np.uint32)
+    indices = temporal_random_jitter_indices(indices, total_frames-1, num_frames, temporal_random_jitter)
     frames = []
+
     for idx, frame in enumerate(container.decode(video=0)):
-        if (idx+1) in indices:
-            frames.append(frame.to_ndarray(format='rgb24'))
+        counts = len(indices[np.isin(indices, idx)])
+        if counts > 0:
+            frames.extend(counts * [frame.to_ndarray(format='rgb24')])
 
     container.close()
     return np.stack(frames)
@@ -54,6 +62,7 @@ class Diving48Dataset(Dataset):
     def __init__(self, dataset_path, num_frames,
                  dataset_type='train',
                  dataset_version='V2',
+                 temporal_random_jitter=0,
                  transform_fn=None,
                  target_fps=None,
                  use_decord=False):
@@ -65,6 +74,7 @@ class Diving48Dataset(Dataset):
         self.num_frames = num_frames
         self.target_fps = target_fps
         self.transform_fn = transform_fn
+        self.temporal_random_jitter = temporal_random_jitter
         self.load_video = decord_load_video if use_decord else load_video_av_optimized
         self._init_dataset()
 
@@ -79,7 +89,7 @@ class Diving48Dataset(Dataset):
         start = time.time()
         video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
 
-        frames = self.load_video(video_path, self.num_frames)
+        frames = self.load_video(video_path, self.num_frames, self.temporal_random_jitter)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:
