@@ -58,7 +58,6 @@ def load_video_av_optimized(video_path, num_frames, temporal_random_jitter=0, te
     indices = temporal_random_offset_indices(indices, total_frames-1, temporal_random_offset)
     indices = temporal_random_jitter_indices(indices, total_frames-1, num_frames, temporal_random_jitter)
     frames = []
-    print(indices, len(indices))
 
     for idx, frame in enumerate(container.decode(video=0)):
         counts = len(indices[np.isin(indices, idx)])
