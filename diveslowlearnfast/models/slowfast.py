@@ -35,8 +35,8 @@ def get_norm(cfg):
     elif cfg.BN.NORM_TYPE == "sync_batchnorm":
         return partial(
             NaiveSyncBatchNorm3d,
-            num_sync_devices=cfg['BN']['NUM_SYNC_DEVICES'],
-            global_sync=cfg['BN']['GLOBAL_SYNC'],
+            num_sync_devices=cfg.BN.NUM_SYNC_DEVICES,
+            global_sync=cfg.BN.GLOBAL_SYNC,
         )
     else:
         raise NotImplementedError(

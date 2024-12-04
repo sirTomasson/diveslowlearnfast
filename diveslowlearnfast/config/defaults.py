@@ -20,12 +20,14 @@ class ConfigData:
     TEMPORAL_RANDOM_JITTER: int = 0
     TEMPORAL_RANDOM_OFFSET: int = 0
 
+
 @dataclass
 class SlowFastConfig:
     ALPHA: int = 8
     BETA_INV: int = 8
     FUSION_CONV_CHANNEL_RATIO: int = 2
     FUSION_KERNEL_SZ: int = 7
+
 
 @dataclass
 class ResNetConfig:
@@ -46,6 +48,7 @@ class ResNetConfig:
     )
     ZERO_INIT_FINAL_CONV: bool = False
 
+
 @dataclass
 class NonLocalConfig:
     LOCATION: list[list[list]] = field(
@@ -64,11 +67,15 @@ class NonLocalConfig:
         ]
     )
 
+
 @dataclass
 class BNConfig:
     NORM_TYPE: str = 'batchnorm'
     USE_PRECISE_STATS: bool = True
     NUM_BATCHES_PRECISE: int = 200
+    GLOBAL_SYNC: bool = False
+    NUM_SYNC_DEVICES: int = 1
+
 
 @dataclass
 class ModelConfig:
@@ -81,13 +88,26 @@ class ModelConfig:
     DETACH_FINAL_FC: bool = False
     FC_INIT_STD: float = 0.01
 
+
 @dataclass
 class DetectionConfig:
     ENABLE: bool = False
 
+
 @dataclass
 class MultiGridConfig:
     SHORT_CYCLE: bool = False
+    LONG_CYCLE: bool = False
+    SHORT_CYCLE_FACTORS: list[float] = field(default_factory=lambda: [0.5, 0.5 ** 0.5])
+    LONG_CYCLE_FACTORS: list[tuple[float]] = field(default_factory=lambda: [
+        (0.25, 0.5 ** 0.5),
+        (0.5, 0.5 ** 0.5),
+        (0.5, 1),
+        (1, 1),
+    ])
+    EPOCH_FACTOR: float = 1.5
+    BN_BASE_SIZE: int = 8
+
 
 @dataclass
 class TrainConfig:
@@ -98,6 +118,7 @@ class TrainConfig:
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
 
+
 @dataclass
 class SolverConfig:
     BASE_LR: int = 0.1
@@ -107,6 +128,8 @@ class SolverConfig:
     WARMUP_EPOCHS: int = 34
     WARMUP_START_LR: int = 0.01
     OPTIMIZING_METHOD: str = 'sgd'
+    STEPS: list[int] = field(default_factory=lambda: [])
+    GAMMA: float = 0.1
 
 
 @dataclass
@@ -115,8 +138,10 @@ class DataLoaderConfig:
     PIN_MEMORY: bool = True
     USE_DECORD: bool = False
 
+
 @dataclass
 class Config:
+    NUM_GPUS: int = 1
     DATA: ConfigData = field(default_factory=ConfigData)
     SLOWFAST: SlowFastConfig = field(default_factory=SlowFastConfig)
     RESNET: ResNetConfig = field(default_factory=ResNetConfig)
