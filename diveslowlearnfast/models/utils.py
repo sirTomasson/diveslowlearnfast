@@ -6,9 +6,15 @@ import os
 
 from glob import glob
 
+from diveslowlearnfast.config import Config
 
-def save_checkpoint(model, optimiser, epoch: int, save_dir: str | Path):
-    path = os.path.join(save_dir, f'checkpoint_{epoch:04d}.pth')
+
+def save_checkpoint(model, optimiser, epoch: int, cfg: Config):
+    if len(cfg.TRAIN.CHECKPOINT_FILENAME) > 0:
+        path = os.path.join(cfg.TRAIN.RESULT_DIR, cfg.TRAIN.CHECKPOINT_FILENAME)
+    else:
+        path = os.path.join(cfg.TRAIN.RESULT_DIR, f'checkpoint_{epoch:04d}.pth')
+
     checkpoint = {
         'epoch': epoch,
         'model_state': model.state_dict(),
@@ -24,8 +30,13 @@ def load_checkpoint(model, optimiser, checkpoint_path: str | Path, device: torch
     return model, optimiser, checkpoint['epoch']
 
 
-def last_checkpoint(save_dir: str | Path):
-    checkpoints = glob(os.path.join(save_dir, 'checkpoint_*.pth'))
+def last_checkpoint(cfg: Config):
+    if len(cfg.TRAIN.CHECKPOINT_FILENAME) > 0:
+        checkpoint_path = os.path.join(cfg.TRAIN.RESULT_DIR, cfg.TRAIN.CHECKPOINT_FILENAME)
+        if os.path.exists(checkpoint_path):
+            return checkpoint_path
+
+    checkpoints = glob(os.path.join(cfg.TRAIN.RESULT_DIR, 'checkpoint_*.pth'))
     if len(checkpoints) <= 0:
         return None
 

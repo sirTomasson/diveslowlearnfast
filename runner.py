@@ -1,5 +1,5 @@
 import copy
-import os.path
+import os
 
 import torch
 
@@ -51,7 +51,7 @@ def main():
     criterion, optimiser, train_loader, test_loader = train_helper.get_train_objects(cfg, model)
 
     start_epoch = 1
-    checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
+    checkpoint_path = last_checkpoint(cfg)
     if cfg.TRAIN.AUTO_RESUME and checkpoint_path is not None:
         model, optimiser, epoch = load_checkpoint(
             model,
@@ -115,7 +115,7 @@ def main():
             save_checkpoint(model,
                             optimiser,
                             epoch,
-                            cfg.TRAIN.RESULT_DIR)
+                            cfg)
 
         stats['train_losses'].append(train_loss)
         stats['train_accuracies'].append(train_acc)

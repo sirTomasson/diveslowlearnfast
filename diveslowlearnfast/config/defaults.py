@@ -116,10 +116,10 @@ class TrainConfig:
     BATCH_SIZE: int = 4
     MACRO_BATCH_SIZE: int = 256
     CHECKPOINT_PERIOD: int = 10
+    CHECKPOINT_FILENAME: str = ''
     EVAL_PERIOD: int = 10
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
-
 
 @dataclass
 class SolverConfig:
