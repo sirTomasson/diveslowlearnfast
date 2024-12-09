@@ -1,22 +1,17 @@
 import copy
 import os.path
 
-import pytorchvideo.transforms
 import torch
 
 from tqdm import tqdm
 
 from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config
-from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count
 from diveslowlearnfast.models.utils import last_checkpoint
-from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch
+from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch, \
+    MultigridSchedule
+from diveslowlearnfast.train import helper as train_helper
 
-from pytorchvideo.transforms import Div255, RandAugment
-from torch.utils.data import DataLoader
-from torchvision.transforms import Compose
-
-from diveslowlearnfast.transforms import Permute, ToTensor4D
 
 def print_device_props(device):
     print(f'Running on {device}')
@@ -47,15 +42,13 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print_device_props(device)
 
-    model = SlowFast(cfg).to(device)
+    multigrid_schedule = None
+    if cfg.MULTIGRID.SHORT_CYCLE or cfg.MULTIGRID.LONG_CYCLE:
+        multigrid_schedule = MultigridSchedule()
+        cfg = multigrid_schedule.init_multigrid(cfg)
 
-    criterion = torch.nn.CrossEntropyLoss()
-    optimiser = torch.optim.SGD(
-        model.parameters(),
-        lr=cfg.SOLVER.BASE_LR,
-        momentum=cfg.SOLVER.MOMENTUM,
-        weight_decay=cfg.SOLVER.WEIGHT_DECAY,
-    )
+    model = SlowFast(cfg).to(device)
+    criterion, optimiser, train_loader, test_loader = train_helper.get_train_objects(cfg, model)
 
     start_epoch = 1
     checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
@@ -67,73 +60,6 @@ def main():
             device
         )
         start_epoch = epoch + 1
-
-    train_transform = Compose([
-        ToTensor4D(),
-        Permute(3, 0, 1, 2), # From T x H X W x 3 -> 3 x T x H x W
-        Div255(),
-        pytorchvideo.transforms.create_video_transform(
-            mode='train',
-            num_samples=cfg.DATA.NUM_FRAMES,
-            video_std=cfg.DATA.MEAN,
-            video_mean=cfg.DATA.STD,
-            convert_to_float=False,
-            crop_size=224,
-            horizontal_flip_prob=0.5,
-            random_resized_crop_paras={'scale': (1.0, 1.0), 'aspect_ratio': (1.0, 1.0)}
-        ),
-        Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W
-        RandAugment(prob=0.5, sampling_type='gaussian'),
-        Permute(1, 0, 2, 3), # From T x 3 x H X W -> 3 x T x H x W
-    ])
-
-    test_transform = Compose([
-        ToTensor4D(),
-        Permute(3, 0, 1, 2),
-        Div255(),
-        pytorchvideo.transforms.create_video_transform(
-            mode='test',
-            num_samples=cfg.DATA.NUM_FRAMES,
-            video_std=cfg.DATA.MEAN,
-            video_mean=cfg.DATA.STD,
-            convert_to_float=False,
-            crop_size=224,
-        ),
-    ])
-
-    train_dataset = Diving48Dataset(
-        cfg.DATA.DATASET_PATH,
-        cfg.DATA.NUM_FRAMES,
-        dataset_type='train',
-        transform_fn=train_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD,
-        temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
-        temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=cfg.TRAIN.BATCH_SIZE,
-        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-        shuffle=True,
-    )
-
-    test_dataset = Diving48Dataset(
-        cfg.DATA.DATASET_PATH,
-        cfg.DATA.NUM_FRAMES,
-        dataset_type='test',
-        transform_fn=test_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD
-    )
-
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=cfg.TRAIN.BATCH_SIZE,
-        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-        shuffle=False,
-    )
 
     print(f'Start training model:')
     parameter_count = get_parameter_count(model)
@@ -156,6 +82,21 @@ def main():
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
+
+        if multigrid_schedule:
+            cfg, changed = multigrid_schedule.update_long_cycle(cfg, epoch)
+            model = SlowFast(cfg).to(device)
+            criterion, optimiser, train_loader, test_loader = train_helper.get_train_objects(cfg, model)
+            checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
+            if checkpoint_path:
+                model, optimiser, _ = load_checkpoint(
+                    model,
+                    optimiser,
+                    checkpoint_path,
+                    device
+                )
+            print(f'[INFO] multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
+
         train_acc, train_loss = run_train_epoch(
             model,
             criterion,
@@ -163,6 +104,7 @@ def main():
             train_loader,
             device,
             cfg,
+            multigrid_schedule
         )
         epoch_bar.set_postfix({
             'acc': f'{train_acc:.3f}',

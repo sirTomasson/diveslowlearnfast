@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.train.multigrid import MultigridSchedule
 from diveslowlearnfast.train.stats import Statistics
 
 
@@ -17,7 +18,8 @@ def run_train_epoch(model: nn.Module,
                     optimiser: torch.optim.Optimizer,
                     loader: DataLoader,
                     device,
-                    cfg: Config):
+                    cfg: Config,
+                    mutligrid_schedule: MultigridSchedule=None):
     stats = Statistics()
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Train batch')
@@ -75,7 +77,12 @@ def run_train_epoch(model: nn.Module,
             'current_loss',
             'current_accuracy',
         )
+        if mutligrid_schedule:
+            mutligrid_schedule.step(cfg)
+            postfix['multigrid_short_cycle_crop_size'] = f'{mutligrid_schedule.get_short_cycle_crop_size(cfg)}'
+
         batch_bar.set_postfix(postfix)
+
 
     mean_accuracy = stats.mean_accuracy()
     mean_loss = stats.mean_loss()

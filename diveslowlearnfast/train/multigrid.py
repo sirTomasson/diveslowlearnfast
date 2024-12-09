@@ -6,6 +6,7 @@ import logging
 
 import numpy as np
 
+from diveslowlearnfast.train.helper import get_train_transform
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class MultigridSchedule:
             cfg (configs): the updated cfg.
         """
         self.schedule = None
+        self.short_cycle_step = 0
         # We may modify cfg.TRAIN.BATCH_SIZE, cfg.DATA.NUM_FRAMES, and
         # cfg.DATA.TRAIN_CROP_SIZE during training, so we store their original
         # value in cfg and use them as global variables.
@@ -77,7 +79,7 @@ class MultigridSchedule:
             cfg.TRAIN.BATCH_SIZE = base_b * cfg.MULTIGRID.DEFAULT_B
 
             bs_factor = (
-                float(cfg.TRAIN.BATCH_SIZE / cfg.NUM_GPUS) / cfg.MULTIGRID.BN_BASE_SIZE
+                    float(cfg.TRAIN.BATCH_SIZE / cfg.NUM_GPUS) / cfg.MULTIGRID.BN_BASE_SIZE
             )
 
             if bs_factor < 1:
@@ -90,7 +92,7 @@ class MultigridSchedule:
                 cfg.BN.NORM_TYPE = "batchnorm"
 
             cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE = cfg.DATA.SAMPLING_RATE * (
-                cfg.MULTIGRID.DEFAULT_T // cfg.DATA.NUM_FRAMES
+                    cfg.MULTIGRID.DEFAULT_T // cfg.DATA.NUM_FRAMES
             )
             logger.info("Long cycle updates:")
             logger.info("\tBN.NORM_TYPE: {}".format(cfg.BN.NORM_TYPE))
@@ -123,7 +125,7 @@ class MultigridSchedule:
 
         steps = cfg.SOLVER.STEPS
 
-        default_size = float(cfg.DATA.NUM_FRAMES * cfg.DATA.TRAIN_CROP_SIZE**2)
+        default_size = float(cfg.DATA.NUM_FRAMES * cfg.DATA.TRAIN_CROP_SIZE ** 2)
         default_iters = steps[-1]
 
         # Get shapes and average batch size for each long cycle shape.
@@ -179,9 +181,9 @@ class MultigridSchedule:
 
         # Obtrain final schedule given desired cfg.MULTIGRID.EPOCH_FACTOR.
         x = (
-            cfg.SOLVER.MAX_EPOCH
-            * cfg.MULTIGRID.EPOCH_FACTOR
-            / sum(s[-1] for s in schedule)
+                cfg.SOLVER.MAX_EPOCH
+                * cfg.MULTIGRID.EPOCH_FACTOR
+                / sum(s[-1] for s in schedule)
         )
 
         final_schedule = []
@@ -192,6 +194,35 @@ class MultigridSchedule:
             final_schedule.append((s[0], s[1], int(round(total_epochs))))
         print_schedule(final_schedule)
         return final_schedule
+
+    def set_dataset(self, dataset, cfg):
+        self.dataset = dataset
+        self._update_transform(cfg)
+
+    def _update_transform(self, cfg):
+        crop_size = self.get_short_cycle_crop_size(cfg)
+        self.dataset.transform_fn = get_train_transform(cfg, crop_size)
+
+    def get_short_cycle_crop_size(self, cfg):
+        short_cycle_idx = None if not cfg.MULTIGRID.SHORT_CYCLE_PERIOD else self.short_cycle_step % cfg.MULTIGRID.SHORT_CYCLE_PERIOD
+        crop_size = cfg.DATA.TRAIN_CROP_SIZE
+        if short_cycle_idx in [0, 1]:
+            crop_size = int(
+                round(
+                    cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
+                    * cfg.MULTIGRID.DEFAULT_S
+                )
+            )
+        return crop_size
+
+    def step(self, cfg):
+        self.short_cycle_step += 1
+        self.dataset.step = self.short_cycle_step
+        self._update_transform(cfg)
+
+    def reset_step(self):
+        self.short_cycle_step = 0
+        self.dataset.step = self.short_cycle_step
 
 
 def print_schedule(schedule):
