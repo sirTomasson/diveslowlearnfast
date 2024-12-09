@@ -65,7 +65,8 @@ def get_train_objects(cfg, model):
         transform_fn=train_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD,
         temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
-        temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET
+        temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
+        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
     )
 
     train_loader = DataLoader(
@@ -81,7 +82,8 @@ def get_train_objects(cfg, model):
         cfg.DATA.NUM_FRAMES,
         dataset_type='test',
         transform_fn=test_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD
+        use_decord=cfg.DATA_LOADER.USE_DECORD,
+        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE
     )
 
     test_loader = DataLoader(

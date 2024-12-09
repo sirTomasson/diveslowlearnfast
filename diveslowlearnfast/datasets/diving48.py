@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 
-def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0):
+def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, **kwargs):
     import decord
     from decord import cpu
 
@@ -45,9 +45,11 @@ def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_r
     return np.sort(clipped)
 
 
-def load_video_av_optimized(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0):
+def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0, temporal_random_offset=0, **kwargs):
     """Efficiently load video frames using uniform sampling"""
     container = av.open(video_path)
+    if multi_thread_decode:
+        container.streams.video[0].thread_type = 'AUTO'
     video_stream = container.streams.video[0]
     total_frames = video_stream.frames
     num_frames = total_frames if num_frames == -1 else num_frames
@@ -83,7 +85,8 @@ class Diving48Dataset(Dataset):
                  temporal_random_offset=0,
                  transform_fn=None,
                  target_fps=None,
-                 use_decord=False):
+                 use_decord=False,
+                 multi_thread_decode=False):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -95,6 +98,7 @@ class Diving48Dataset(Dataset):
         self.temporal_random_jitter = temporal_random_jitter
         self.temporal_random_offset = temporal_random_offset
         self.load_video = decord_load_video if use_decord else load_video_av_optimized
+        self.multi_thread_decode = multi_thread_decode
         self._init_dataset()
 
     def _init_dataset(self):
@@ -108,7 +112,11 @@ class Diving48Dataset(Dataset):
         start = time.time()
         video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
 
-        frames = self.load_video(video_path, self.num_frames, self.temporal_random_jitter, self.temporal_random_offset)
+        frames = self.load_video(video_path,
+                                 self.num_frames,
+                                 self.temporal_random_jitter,
+                                 self.temporal_random_offset,
+                                 multithread_decode=self.multi_thread_decode)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:
