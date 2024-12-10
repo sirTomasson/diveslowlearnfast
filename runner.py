@@ -130,8 +130,8 @@ def main():
                 cfg,
             )
             model.train()
-            stats['test_losses'].append(test_acc)
-            stats['test_accuracies'].append(test_loss)
+            stats['test_losses'].append(test_loss)
+            stats['test_accuracies'].append(test_acc)
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
 
