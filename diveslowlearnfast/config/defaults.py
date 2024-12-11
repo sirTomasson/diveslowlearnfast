@@ -130,7 +130,7 @@ class SolverConfig:
     WARMUP_EPOCHS: int = 34
     WARMUP_START_LR: int = 0.01
     OPTIMIZING_METHOD: str = 'sgd'
-    STEPS: list[int] = field(default_factory=lambda: [])
+    STEPS: list[int] = field(default_factory=lambda: [0, 94, 154, 196])
     GAMMA: float = 0.1
 
 
