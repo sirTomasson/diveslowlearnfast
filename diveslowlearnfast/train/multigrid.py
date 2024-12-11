@@ -217,12 +217,10 @@ class MultigridSchedule:
 
     def step(self, cfg):
         self.short_cycle_step += 1
-        self.dataset.step = self.short_cycle_step
         self._update_transform(cfg)
 
     def reset_step(self):
         self.short_cycle_step = 0
-        self.dataset.step = self.short_cycle_step
 
 
 def print_schedule(schedule):

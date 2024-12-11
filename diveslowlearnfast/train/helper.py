@@ -45,6 +45,28 @@ def get_test_transform(cfg: Config):
         ),
     ])
 
+def get_test_objects(cfg):
+    test_transform = get_test_transform(cfg)
+
+    test_dataset = Diving48Dataset(
+        cfg.DATA.DATASET_PATH,
+        cfg.DATA.NUM_FRAMES,
+        dataset_type='test',
+        transform_fn=test_transform,
+        use_decord=cfg.DATA_LOADER.USE_DECORD,
+        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=cfg.TRAIN.BATCH_SIZE,
+        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+        shuffle=False,
+    )
+
+    return test_loader
+
 def get_train_objects(cfg, model):
     criterion = torch.nn.CrossEntropyLoss()
     optimiser = torch.optim.SGD(
@@ -55,8 +77,6 @@ def get_train_objects(cfg, model):
     )
 
     train_transform = get_train_transform(cfg)
-
-    test_transform = get_test_transform(cfg)
 
     train_dataset = Diving48Dataset(
         cfg.DATA.DATASET_PATH,
@@ -77,20 +97,4 @@ def get_train_objects(cfg, model):
         shuffle=True,
     )
 
-    test_dataset = Diving48Dataset(
-        cfg.DATA.DATASET_PATH,
-        cfg.DATA.NUM_FRAMES,
-        dataset_type='test',
-        transform_fn=test_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD,
-        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE
-    )
-
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=cfg.TRAIN.BATCH_SIZE,
-        pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-        num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-        shuffle=False,
-    )
-    return criterion, optimiser, train_loader, test_loader
+    return criterion, optimiser, train_loader, train_dataset

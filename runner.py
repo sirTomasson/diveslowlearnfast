@@ -44,13 +44,15 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print_device_props(device)
 
+    # get the test objects before applying the multigrid config, this ensures the test batch size won't change
+    test_loader = train_helper.get_test_objects(cfg)
     multigrid_schedule = None
     if cfg.MULTIGRID.SHORT_CYCLE or cfg.MULTIGRID.LONG_CYCLE:
         multigrid_schedule = MultigridSchedule()
         cfg = multigrid_schedule.init_multigrid(cfg)
 
     model = SlowFast(cfg).to(device)
-    criterion, optimiser, train_loader, test_loader = train_helper.get_train_objects(cfg, model)
+    criterion, optimiser, train_loader = train_helper.get_train_objects(cfg, model)
 
     start_epoch = 1
     checkpoint_path = last_checkpoint(cfg)
@@ -88,7 +90,8 @@ def main():
         if multigrid_schedule:
             cfg, changed = multigrid_schedule.update_long_cycle(cfg, epoch)
             model = SlowFast(cfg).to(device)
-            criterion, optimiser, train_loader, test_loader = train_helper.get_train_objects(cfg, model)
+            criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
+            multigrid_schedule.set_dataset(train_dataset, cfg)
             checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
             if checkpoint_path:
                 model, optimiser, _ = load_checkpoint(
