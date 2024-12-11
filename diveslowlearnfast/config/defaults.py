@@ -108,7 +108,7 @@ class MultiGridConfig:
     ])
     EPOCH_FACTOR: float = 1.5
     BN_BASE_SIZE: int = 8
-    SHORT_CYCLE_PERIOD = 3
+    SHORT_CYCLE_PERIOD: int = 3
 
 
 @dataclass
