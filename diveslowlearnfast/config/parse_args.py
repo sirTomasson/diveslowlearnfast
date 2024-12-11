@@ -23,7 +23,9 @@ def include_config_in_parser(cfg, parser, namespace=None):
         else:
             arg = f'{namespace}.{k}' if namespace else k
             if type(v) is bool:
-                parser.add_argument(f"--{arg}", default=v, action='store_true')
+                parser.add_argument(f'--{arg}', default=v, action='store_true')
+            elif type(v) is list:
+                parser.add_argument(f'--{arg}', default=v, nargs='+')
             else:
                 parser.add_argument(f"--{arg}", type=type(v), default=v)
 

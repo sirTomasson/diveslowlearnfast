@@ -25,14 +25,16 @@ def print_device_props(device):
 
 
 def main():
-    cfg = parse_args()
-    config_path = os.path.join(cfg.TRAIN.RESULT_DIR, 'config.json')
+    args = parse_args()
+    config_path = os.path.join(args.TRAIN.RESULT_DIR, 'config.json')
 
     if os.path.exists(config_path):
         print(f'[INFO] Loading config from {config_path}, arguments are ignored')
         cfg = load_config(config_path)
+        cfg.DATA.DATASET_PATH = args.DATA.DATASET_PATH
     else:
         print(f'[INFO] Saving config to {config_path}')
+        cfg = args
         dict_cfg = to_dict(copy.deepcopy(cfg))
         save_config(dict_cfg, config_path)
 
