@@ -40,7 +40,7 @@ def include_config_in_parser(cfg, parser, namespace=None):
                 parser.add_argument(f"--{arg}", type=type(v), default=v)
 
 
-def parse_args(*args) -> Config:
+def parse_args() -> Config:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description='SlowFast network runner',
@@ -54,7 +54,7 @@ def parse_args(*args) -> Config:
 
     include_config_in_parser(Config(), parser)
 
-    args = parser.parse_args(args)
+    args = parser.parse_args()
     nested_dict = {}
     for arg, value in vars(args).items():
         parts = arg.split('.')
