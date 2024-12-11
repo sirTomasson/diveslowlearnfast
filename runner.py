@@ -52,7 +52,7 @@ def main():
         cfg = multigrid_schedule.init_multigrid(cfg)
 
     model = SlowFast(cfg).to(device)
-    criterion, optimiser, train_loader = train_helper.get_train_objects(cfg, model)
+    criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
 
     start_epoch = 1
     checkpoint_path = last_checkpoint(cfg)

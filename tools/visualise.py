@@ -1,6 +1,5 @@
 import argparse
 import json
-from ast import parse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
