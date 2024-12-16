@@ -204,7 +204,7 @@ class MultigridSchedule:
         self.dataset.transform_fn = get_train_transform(cfg, crop_size)
 
     def get_short_cycle_crop_size(self, cfg):
-        short_cycle_idx = None if not cfg.MULTIGRID.SHORT_CYCLE_PERIOD else self.short_cycle_step % cfg.MULTIGRID.SHORT_CYCLE_PERIOD
+        short_cycle_idx = self.short_cycle_step % cfg.MULTIGRID.SHORT_CYCLE_PERIOD if cfg.MULTIGRID.SHORT_CYCLE else None
         crop_size = cfg.DATA.TRAIN_CROP_SIZE
         if short_cycle_idx in [0, 1]:
             crop_size = int(
