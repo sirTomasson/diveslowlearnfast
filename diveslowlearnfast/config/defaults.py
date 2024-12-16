@@ -20,6 +20,8 @@ class ConfigData:
     TEMPORAL_RANDOM_JITTER: int = 0
     TEMPORAL_RANDOM_OFFSET: int = 0
     MULTI_THREAD_DECODE: bool = False
+    RAND_AUGMENT: bool = False
+    RANDOM_ROTATE: bool = False
 
 
 @dataclass

@@ -6,14 +6,14 @@ from torchvision.transforms.v2 import Compose
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
-from diveslowlearnfast.transforms import ToTensor4D, Permute
+from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 
 def get_train_transform(cfg: Config, crop_size=None):
     crop_size = cfg.DATA.TRAIN_CROP_SIZE if crop_size is None else crop_size
-    return Compose([
+    transformations = [
         ToTensor4D(),
-        Permute(3, 0, 1, 2), # From T x H X W x 3 -> 3 x T x H x W
+        Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
         Div255(),
         pytorchvideo.transforms.create_video_transform(
             mode='train',
@@ -24,11 +24,21 @@ def get_train_transform(cfg: Config, crop_size=None):
             crop_size=crop_size,
             horizontal_flip_prob=0.5,
             random_resized_crop_paras={'scale': (1.0, 1.0), 'aspect_ratio': (1.0, 1.0)}
-        ),
-        Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
-        RandAugment(prob=0.5, sampling_type='gaussian'),
-        Permute(1, 0, 2, 3), # From T x 3 x H X W -> 3 x T x H x W
-    ])
+        )
+    ]
+    if cfg.DATA.RAND_AUGMENT:
+        transformations.extend([
+            Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
+            RandAugment(prob=0.5, sampling_type='gaussian'),
+            Permute(1, 0, 2, 3), # From T x 3 x H X W -> 3 x T x H x W
+        ])
+    if cfg.DATA.RANDOM_ROTATE:
+        transformations.extend([
+            Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
+            RandomRotateVideo(-30, 30),
+            Permute(1, 0, 2, 3),  # From T x 3 x H X W -> 3 x T x H x W
+        ])
+    return Compose(transformations)
 
 def get_test_transform(cfg: Config):
     return Compose([
