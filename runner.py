@@ -92,7 +92,7 @@ def main():
             model = SlowFast(cfg).to(device)
             criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
             multigrid_schedule.set_dataset(train_dataset, cfg)
-            checkpoint_path = last_checkpoint(cfg.TRAIN.RESULT_DIR)
+            checkpoint_path = last_checkpoint(cfg)
             if checkpoint_path:
                 model, optimiser, _ = load_checkpoint(
                     model,

@@ -1,7 +1,5 @@
 __all__ = ['SlowFast']
 
-from typing import Iterator
-
 import torch
 
 import torch.nn as nn
@@ -11,7 +9,6 @@ from functools import partial
 from pytorchvideo.layers.batch_norm import NaiveSyncBatchNorm1d, NaiveSyncBatchNorm3d
 from pytorchvideo.layers.swish import Swish
 from pytorchvideo.layers.drop_path import drop_path
-from torch.nn import Parameter
 
 from torchvision.ops import roi_align
 

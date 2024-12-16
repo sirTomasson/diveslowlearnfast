@@ -2,7 +2,6 @@ import time
 import torch
 
 import numpy as np
-from networkx.algorithms.core import core_number
 
 from torch import nn
 from torch.utils.data import DataLoader
@@ -24,6 +23,7 @@ def run_train_epoch(model: nn.Module,
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Train batch')
     n_macro_batches = cfg.TRAIN.MACRO_BATCH_SIZE // cfg.TRAIN.BATCH_SIZE
+    n_macro_batches = n_macro_batches if n_macro_batches > 0 else 1
     loss = 0
     correct = 0
     count = 0
