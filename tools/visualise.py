@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def display(stats_path, which='losses', mode='train'):
     assert which in ['accuracies', 'losses']
@@ -20,15 +22,45 @@ def display(stats_path, which='losses', mode='train'):
 
 
 def display_all(stats_path, **kwargs):
-    fig, axis = plt.subplots(2, 2, figsize=(10, 8))
     with open(stats_path, 'rb') as f:
         stats = json.load(f)
 
-    for ax, (k, v) in zip(axis.flatten(), stats.items()):
-        ax.plot(v)
-        ax.set_title(k)
-        ax.grid()
 
+    test_losses = stats['test_losses']
+    train_losses = stats['train_losses']
+
+    if len(test_losses) > 0:
+        x_old = np.arange(len(test_losses))
+        x_new = np.linspace(0, len(test_losses), len(train_losses))
+        test_losses = np.interp(x_new, x_old, test_losses)
+
+        plt.plot(test_losses, label='test')
+
+    plt.plot(train_losses, label='train')
+
+    plt.grid()
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    test_accuracies = stats['test_accuracies']
+    train_accuracies = stats['train_accuracies']
+
+    if len(test_accuracies) > 0:
+        x_old = np.arange(len(test_accuracies))
+        x_new = np.linspace(0, len(test_accuracies), len(train_losses))
+        test_accuracies = np.interp(x_new, x_old, test_accuracies)
+
+        plt.plot(test_accuracies, label='test')
+
+    plt.plot(train_accuracies, label='train')
+
+    plt.grid()
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
