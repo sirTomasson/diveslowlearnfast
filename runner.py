@@ -54,8 +54,14 @@ def main():
     model = SlowFast(cfg).to(device)
     criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
 
-    start_epoch = 1
     checkpoint_path = last_checkpoint(cfg)
+    # If there is a checkpoint_path it is not worth using these weights
+    if len(cfg.TRAIN.WEIGHTS_PATH) > 0 and not checkpoint_path:
+        print(f'[INFO] Using pre-trained weights from {cfg.TRAIN.WEIGHTS_PATH}')
+        weights = torch.load(cfg.TRAIN.WEIGHTS_PATH, map_location=device)
+        model.load_state_dict(weights)
+
+    start_epoch = 1
     if cfg.TRAIN.AUTO_RESUME and checkpoint_path is not None:
         model, optimiser, epoch = load_checkpoint(
             model,

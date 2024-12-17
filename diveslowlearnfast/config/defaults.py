@@ -122,6 +122,7 @@ class TrainConfig:
     EVAL_PERIOD: int = 10
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
+    WEIGHTS_PATH: str = ''
 
 @dataclass
 class SolverConfig:
