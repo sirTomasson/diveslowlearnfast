@@ -38,6 +38,7 @@ def display_all(stats_path, **kwargs):
 
     plt.plot(train_losses, label='train')
 
+    plt.title(f'{stats_path}: Loss')
     plt.grid()
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -57,6 +58,7 @@ def display_all(stats_path, **kwargs):
 
     plt.plot(train_accuracies, label='train')
 
+    plt.title(f'{stats_path}: Accuracy')
     plt.grid()
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')

@@ -1,17 +1,22 @@
 import copy
 import os
-
 import torch
+import logging
 
 from tqdm import tqdm
 
 from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config
-from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count
+from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count, load_checkpoint_compat
 from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch, \
     MultigridSchedule
 from diveslowlearnfast.train import helper as train_helper
 
+logger = logging.getLogger(__name__)
+
+def set_log_level():
+    level = os.getenv('LOG_LEVEL')
+    logger.setLevel(level)
 
 def print_device_props(device):
     print(f'Running on {device}')
@@ -25,15 +30,16 @@ def print_device_props(device):
 
 
 def main():
+    set_log_level()
     args = parse_args()
     config_path = os.path.join(args.TRAIN.RESULT_DIR, 'config.json')
 
     if os.path.exists(config_path):
-        print(f'[INFO] Loading config from {config_path}, arguments are ignored')
+        logger.info(f'Loading config from {config_path}, arguments are ignored')
         cfg = load_config(config_path)
         cfg.DATA.DATASET_PATH = args.DATA.DATASET_PATH
     else:
-        print(f'[INFO] Saving config to {config_path}')
+        logger.info(f'Saving config to {config_path}')
         cfg = args
         dict_cfg = to_dict(copy.deepcopy(cfg))
         save_config(dict_cfg, config_path)
@@ -54,14 +60,14 @@ def main():
     model = SlowFast(cfg).to(device)
     criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
 
-    checkpoint_path = last_checkpoint(cfg)
     # If there is a checkpoint_path it is not worth using these weights
-    if len(cfg.TRAIN.WEIGHTS_PATH) > 0 and not checkpoint_path:
-        print(f'[INFO] Using pre-trained weights from {cfg.TRAIN.WEIGHTS_PATH}')
-        weights = torch.load(cfg.TRAIN.WEIGHTS_PATH, map_location=device)
-        model.load_state_dict(weights)
+    if len(cfg.TRAIN.WEIGHTS_PATH) > 0:
+        logger.info(f'Using pre-trained weights from {cfg.TRAIN.WEIGHTS_PATH}')
+        load_checkpoint_compat(cfg.TRAIN.WEIGHTS_PATH, model, convert_from_caffe2=True, data_parallel=False)
+        model = model.to(device)
 
     start_epoch = 1
+    checkpoint_path = last_checkpoint(cfg)
     if cfg.TRAIN.AUTO_RESUME and checkpoint_path is not None:
         model, optimiser, epoch = load_checkpoint(
             model,
@@ -73,12 +79,13 @@ def main():
 
     print(f'Start training model:')
     parameter_count = get_parameter_count(model)
-    print(f'parameter count = {parameter_count}')
+    logger.info(f'parameter count = {parameter_count}')
     # 4bytes x 3 (1model + 1gradient + 1optimiser)
     total_parameter_bytes = parameter_count * 12
-    print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
-    print(f'from checkpoint = {checkpoint_path}')
+    logger.info(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
+    logger.info(f'from checkpoint = {checkpoint_path}')
 
+    model.train()
     if checkpoint_path is None:
         run_warmup(model, optimiser, criterion, train_loader, device, cfg)
         optimiser = torch.optim.SGD(
@@ -88,7 +95,6 @@ def main():
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
 
-    model.train()
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
@@ -106,7 +112,7 @@ def main():
                     checkpoint_path,
                     device
                 )
-            print(f'[INFO] multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
+            logger.info(f'multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
 
         train_acc, train_loss = run_train_epoch(
             model,
