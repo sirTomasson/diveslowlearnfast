@@ -20,8 +20,18 @@ class ConfigData:
     TEMPORAL_RANDOM_JITTER: int = 0
     TEMPORAL_RANDOM_OFFSET: int = 0
     MULTI_THREAD_DECODE: bool = False
-    RAND_AUGMENT: bool = False
-    RANDOM_ROTATE: bool = False
+
+
+class ConfigRandAugment:
+    ENABLED: bool = False
+    PROB: float = 0.5
+    NUM_LAYERS: int = 2
+    MAGNITUDE: int = 9
+
+
+class ConfigRandomRotate:
+    ENABLED: bool = False
+    MAX_DEGREE: int = 30
 
 
 @dataclass
@@ -124,6 +134,7 @@ class TrainConfig:
     RESULT_DIR: Path = Path('results')
     WEIGHTS_PATH: str = ''
 
+
 @dataclass
 class SolverConfig:
     BASE_LR: int = 0.1
@@ -158,3 +169,5 @@ class Config:
     TRAIN: TrainConfig = field(default_factory=TrainConfig)
     SOLVER: SolverConfig = field(default_factory=SolverConfig)
     DATA_LOADER: DataLoaderConfig = field(default_factory=DataLoaderConfig)
+    RAND_AUGMENT: ConfigRandAugment = field(default_factory=ConfigRandAugment)
+    RANDOM_ROTATE: ConfigRandomRotate = field(default_factory=ConfigRandomRotate)

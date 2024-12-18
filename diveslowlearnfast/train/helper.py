@@ -11,6 +11,7 @@ from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 def get_train_transform(cfg: Config, crop_size=None):
     crop_size = cfg.DATA.TRAIN_CROP_SIZE if crop_size is None else crop_size
+    aug_type = 'randaug' if cfg.RAND_AUGMENT.ENABLED else 'default'
     transformations = [
         ToTensor4D(),
         Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
@@ -22,23 +23,24 @@ def get_train_transform(cfg: Config, crop_size=None):
             video_mean=cfg.DATA.STD,
             convert_to_float=False,
             crop_size=crop_size,
+            aug_type=aug_type,
+            aug_paras={
+                'num_layers': cfg.RAND_AUGMENT.NUM_LAYERS,
+                'magnitude': cfg.RAND_AUGMENT.MAGNITUDE,
+                'prob': cfg.RAND_AUGMENT.PROB,
+            },
             horizontal_flip_prob=0.5,
-            random_resized_crop_paras={'scale': (1.0, 1.0), 'aspect_ratio': (1.0, 1.0)}
         )
     ]
-    if cfg.DATA.RAND_AUGMENT:
+    if cfg.RANDOM_ROTATE.ENABLED:
+        angle = cfg.RANDOM_ROTATE.MAX_DEGREE
         transformations.extend([
-            Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
-            RandAugment(prob=0.5, sampling_type='gaussian'),
-            Permute(1, 0, 2, 3), # From T x 3 x H X W -> 3 x T x H x W
-        ])
-    if cfg.DATA.RANDOM_ROTATE:
-        transformations.extend([
-            Permute(1, 0, 2, 3), # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
-            RandomRotateVideo(-30, 30),
+            Permute(1, 0, 2, 3),  # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
+            RandomRotateVideo(-angle, angle),
             Permute(1, 0, 2, 3),  # From T x 3 x H X W -> 3 x T x H x W
         ])
     return Compose(transformations)
+
 
 def get_test_transform(cfg: Config):
     return Compose([
@@ -54,6 +56,7 @@ def get_test_transform(cfg: Config):
             crop_size=cfg.DATA.TEST_CROP_SIZE,
         ),
     ])
+
 
 def get_test_objects(cfg):
     test_transform = get_test_transform(cfg)
@@ -76,6 +79,7 @@ def get_test_objects(cfg):
     )
 
     return test_loader
+
 
 def get_train_objects(cfg, model):
     criterion = torch.nn.CrossEntropyLoss()
