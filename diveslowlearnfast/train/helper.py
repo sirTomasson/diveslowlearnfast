@@ -9,9 +9,27 @@ from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 
+def get_aug_paras(cfg: Config):
+    if not cfg.RAND_AUGMENT.ENABLED:
+        return None
+
+    return {
+        'num_layers': cfg.RAND_AUGMENT.NUM_LAYERS,
+        'magnitude': cfg.RAND_AUGMENT.MAGNITUDE,
+        'prob': cfg.RAND_AUGMENT.PROB,
+    }
+
+
+def get_aug_type(cfg: Config):
+    if cfg.RAND_AUGMENT.ENABLED:
+        return 'randaug'
+
+    return 'default'
+
+
 def get_train_transform(cfg: Config, crop_size=None):
     crop_size = cfg.DATA.TRAIN_CROP_SIZE if crop_size is None else crop_size
-    aug_type = 'randaug' if cfg.RAND_AUGMENT.ENABLED else 'default'
+
     transformations = [
         ToTensor4D(),
         Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
@@ -23,12 +41,8 @@ def get_train_transform(cfg: Config, crop_size=None):
             video_mean=cfg.DATA.STD,
             convert_to_float=False,
             crop_size=crop_size,
-            aug_type=aug_type,
-            aug_paras={
-                'num_layers': cfg.RAND_AUGMENT.NUM_LAYERS,
-                'magnitude': cfg.RAND_AUGMENT.MAGNITUDE,
-                'prob': cfg.RAND_AUGMENT.PROB,
-            },
+            aug_type=get_aug_type(cfg),
+            aug_paras=get_aug_paras(cfg),
             horizontal_flip_prob=0.5,
         )
     ]

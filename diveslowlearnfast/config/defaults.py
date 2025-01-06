@@ -21,15 +21,15 @@ class ConfigData:
     TEMPORAL_RANDOM_OFFSET: int = 0
     MULTI_THREAD_DECODE: bool = False
 
-
-class ConfigRandAugment:
+@dataclass
+class RandAugmentConfig:
     ENABLED: bool = False
     PROB: float = 0.5
     NUM_LAYERS: int = 2
     MAGNITUDE: int = 9
 
-
-class ConfigRandomRotate:
+@dataclass
+class RandomRotateConfig:
     ENABLED: bool = False
     MAX_DEGREE: int = 30
 
@@ -169,5 +169,5 @@ class Config:
     TRAIN: TrainConfig = field(default_factory=TrainConfig)
     SOLVER: SolverConfig = field(default_factory=SolverConfig)
     DATA_LOADER: DataLoaderConfig = field(default_factory=DataLoaderConfig)
-    RAND_AUGMENT: ConfigRandAugment = field(default_factory=ConfigRandAugment)
-    RANDOM_ROTATE: ConfigRandomRotate = field(default_factory=ConfigRandomRotate)
+    RAND_AUGMENT: RandAugmentConfig = field(default_factory=RandAugmentConfig)
+    RANDOM_ROTATE: RandomRotateConfig = field(default_factory=RandomRotateConfig)

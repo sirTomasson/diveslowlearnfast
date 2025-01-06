@@ -40,7 +40,7 @@ def include_config_in_parser(cfg, parser, namespace=None):
                 parser.add_argument(f"--{arg}", type=type(v), default=v)
 
 
-def parse_args() -> Config:
+def parse_args(*args) -> Config:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description='SlowFast network runner',
@@ -54,7 +54,11 @@ def parse_args() -> Config:
 
     include_config_in_parser(Config(), parser)
 
-    args = parser.parse_args()
+    if len(args) > 0:
+        args = parser.parse_args(args)
+    else:
+        args = parser.parse_args()
+
     nested_dict = {}
     for arg, value in vars(args).items():
         parts = arg.split('.')
@@ -74,10 +78,12 @@ class ParseArgsTest(unittest.TestCase):
         args = parse_args('xyz',
                           '--DATA_LOADER.PIN_MEMORY',
                           '--DATA_LOADER.NUM_WORKERS', '2',
-                          '--SOLVER.STEPS', '1,2,3,4')
+                          '--SOLVER.STEPS', '1,2,3,4',
+                          '--RANDOM_ROTATE.ENABLED')
         self.assertEqual(args.DATA_LOADER.NUM_WORKERS, 2)
         self.assertTrue(args.DATA_LOADER.PIN_MEMORY)
         self.assertEqual(args.SOLVER.STEPS, [1, 2, 3, 4])
+        self.assertEqual(args.RANDOM_ROTATE.ENABLED, True)
 
 
 

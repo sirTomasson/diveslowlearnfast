@@ -15,7 +15,7 @@ from diveslowlearnfast.train import helper as train_helper
 logger = logging.getLogger(__name__)
 
 def set_log_level():
-    level = os.getenv('LOG_LEVEL')
+    level = os.getenv('LOG_LEVEL', 'INFO')
     logger.setLevel(level)
 
 def print_device_props(device):
