@@ -124,5 +124,26 @@ class Diving48DatasetTest(unittest.TestCase):
         self.assertEqual(diving48.num_classes, 4)
 
 
+    def test_include_labels(self):
+        diving48_train = Diving48Dataset(DATASET_PATH,
+                                   dataset_type='train',
+                                   num_frames=2)
+        self.assertEqual(len(diving48_train.labels), 48)
+        diving48_train = Diving48Dataset(DATASET_PATH,
+                                   dataset_type='train',
+                                   num_frames=2,
+                                   threshold=800)
+        self.assertEqual(diving48_train.labels, [7, 26, 35, 46])
+        diving48_test = Diving48Dataset(DATASET_PATH,
+                                         dataset_type='test',
+                                         num_frames=2)
+        diving48_test2 = Diving48Dataset(DATASET_PATH,
+                                         dataset_type='test',
+                                         num_frames=2,
+                                         include_labels=diving48_train.labels)
+        self.assertGreater(diving48_test.num_videos, diving48_test2.num_videos)
+        self.assertEqual(diving48_test2.labels, diving48_train.labels)
+
+
 if __name__ == '__main__':
     unittest.main()

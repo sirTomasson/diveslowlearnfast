@@ -72,7 +72,7 @@ def get_test_transform(cfg: Config):
     ])
 
 
-def get_test_objects(cfg):
+def get_test_objects(cfg, include_labels=None):
     test_transform = get_test_transform(cfg)
 
     test_dataset = Diving48Dataset(
@@ -81,7 +81,8 @@ def get_test_objects(cfg):
         dataset_type='test',
         transform_fn=test_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD,
-        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE
+        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+        include_labels=include_labels,
     )
 
     test_loader = DataLoader(
@@ -93,6 +94,18 @@ def get_test_objects(cfg):
     )
 
     return test_loader
+
+
+def get_include_labels(cfg):
+    if cfg.DATA.THRESHOLD < 0:
+        return None
+
+    return Diving48Dataset(
+        cfg.DATA.DATASET_PATH,
+        cfg.DATA.NUM_FRAMES,
+        dataset_type='train',
+        threshold=cfg.DATA.THRESHOLD,
+    ).labels
 
 
 def get_train_objects(cfg, model):

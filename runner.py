@@ -51,7 +51,8 @@ def main():
     print_device_props(device)
 
     # get the test objects before applying the multigrid config, this ensures the test batch size won't change
-    test_loader = train_helper.get_test_objects(cfg)
+    labels = train_helper.get_include_labels(cfg)
+    test_loader = train_helper.get_test_objects(cfg, labels)
     multigrid_schedule = None
     if cfg.MULTIGRID.SHORT_CYCLE or cfg.MULTIGRID.LONG_CYCLE:
         multigrid_schedule = MultigridSchedule()

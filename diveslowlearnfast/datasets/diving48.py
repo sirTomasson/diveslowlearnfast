@@ -89,7 +89,8 @@ class Diving48Dataset(Dataset):
                  use_decord=False,
                  multi_thread_decode=False,
                  threshold=-1,
-                 seed=42):
+                 seed=42,
+                 include_labels=None):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -104,6 +105,7 @@ class Diving48Dataset(Dataset):
         self.multi_thread_decode = multi_thread_decode
         self.threshold = threshold
         self.seed = seed
+        self.include_labels = include_labels
         self._init_dataset()
 
     def _init_dataset(self):
@@ -113,10 +115,11 @@ class Diving48Dataset(Dataset):
         with open(self.vocab_path, 'rb') as f:
             self.vocab = json.loads(f.read())
 
-        if self.threshold < 0:
-            return
+        if self.threshold > 0:
+            self._filter_data()
 
-        self._filter_data()
+        if self.include_labels is not None:
+            self._include_labels()
 
     def _filter_data(self):
         # convert data to { label: [ {...}, {...}.. ] }
@@ -127,7 +130,7 @@ class Diving48Dataset(Dataset):
         # set the seed so we take the same sample everytime
         rng = np.random.default_rng(seed=self.seed)
         data = []
-        vocab = { }
+        vocab = {}
         for k, v in labels_2_vids.items():
             if len(v) < self.threshold:
                 continue
@@ -139,6 +142,10 @@ class Diving48Dataset(Dataset):
 
         self.vocab = vocab
         self.data = data
+
+    def _include_labels(self):
+        self.data = list(filter(lambda x: x['label'] in self.include_labels, self.data))
+        self.vocab = {k: self.vocab[k] for k in self.include_labels}
 
     def _read_frames(self, video_id):
         start = time.time()
@@ -176,6 +183,13 @@ class Diving48Dataset(Dataset):
     @property
     def num_classes(self):
         return len(self.vocab)
+
+    @property
+    def labels(self):
+        if type(self.vocab) is dict:
+            return list(self.vocab.keys())
+        else:
+            return list(range(len(self.vocab)))
 
     def get_label(self, idx):
         return self.vocab[idx]
