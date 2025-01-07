@@ -115,6 +115,7 @@ def get_train_objects(cfg, model):
         temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
         temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
         multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+        threshold=cfg.DATA.THRESHOLD,
     )
 
     train_loader = DataLoader(

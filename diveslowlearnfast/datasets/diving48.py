@@ -45,7 +45,8 @@ def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_r
     return np.sort(clipped)
 
 
-def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0, temporal_random_offset=0, **kwargs):
+def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0,
+                            temporal_random_offset=0, **kwargs):
     """Efficiently load video frames using uniform sampling"""
     container = av.open(video_path)
     if multi_thread_decode:
@@ -86,7 +87,9 @@ class Diving48Dataset(Dataset):
                  transform_fn=None,
                  target_fps=None,
                  use_decord=False,
-                 multi_thread_decode=False):
+                 multi_thread_decode=False,
+                 threshold=-1,
+                 seed=42):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -99,6 +102,8 @@ class Diving48Dataset(Dataset):
         self.temporal_random_offset = temporal_random_offset
         self.load_video = decord_load_video if use_decord else load_video_av_optimized
         self.multi_thread_decode = multi_thread_decode
+        self.threshold = threshold
+        self.seed = seed
         self._init_dataset()
 
     def _init_dataset(self):
@@ -107,6 +112,33 @@ class Diving48Dataset(Dataset):
 
         with open(self.vocab_path, 'rb') as f:
             self.vocab = json.loads(f.read())
+
+        if self.threshold < 0:
+            return
+
+        self._filter_data()
+
+    def _filter_data(self):
+        # convert data to { label: [ {...}, {...}.. ] }
+        labels_2_vids = {label: [] for label in range(len(self.vocab))}
+        for item in self.data:
+            labels_2_vids[item['label']].append(item)
+
+        # set the seed so we take the same sample everytime
+        rng = np.random.default_rng(seed=self.seed)
+        data = []
+        vocab = { }
+        for k, v in labels_2_vids.items():
+            if len(v) < self.threshold:
+                continue
+
+            # choose threshold number of videos to keep and add them to our new data
+            v = rng.choice(v, self.threshold, replace=False)
+            vocab[k] = self.vocab[k]
+            data.extend(v)
+
+        self.vocab = vocab
+        self.data = data
 
     def _read_frames(self, video_id):
         start = time.time()
@@ -140,6 +172,10 @@ class Diving48Dataset(Dataset):
     @property
     def num_videos(self):
         return len(self.data)
+
+    @property
+    def num_classes(self):
+        return len(self.vocab)
 
     def get_label(self, idx):
         return self.vocab[idx]

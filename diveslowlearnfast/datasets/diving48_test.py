@@ -114,6 +114,15 @@ class Diving48DatasetTest(unittest.TestCase):
         x, *_ = next(dataset)
         self.assertEqual(x.size(), torch.Size((3, 8, 112, 112)))
 
+    def test_threshold(self):
+        diving48 = Diving48Dataset(DATASET_PATH,
+                                   dataset_type='train',
+                                   num_frames=2,
+                                   threshold=800)
+        # for this threshold we will only have 4 classes remaining
+        self.assertEqual(diving48.num_videos, 3200)
+        self.assertEqual(diving48.num_classes, 4)
+
 
 if __name__ == '__main__':
     unittest.main()

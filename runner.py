@@ -15,8 +15,8 @@ from diveslowlearnfast.train import helper as train_helper
 logger = logging.getLogger(__name__)
 
 def set_log_level():
-    level = os.getenv('LOG_LEVEL', 'INFO')
-    logger.setLevel(level)
+    logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
+
 
 def print_device_props(device):
     print(f'Running on {device}')
@@ -60,6 +60,10 @@ def main():
     model = SlowFast(cfg).to(device)
     criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
 
+    if cfg.DATA.THRESHOLD > 0 and train_dataset.num_classes != cfg.MODEL.NUM_CLASSES:
+        logger.info(f'Threshold set and actual num_classes is less than specified in the config, updating to: {train_dataset.num_classes}.')
+        cfg.MODEL.NUM_CLASSES = train_dataset.num_classes
+
     # If there is a checkpoint_path it is not worth using these weights
     if len(cfg.TRAIN.WEIGHTS_PATH) > 0:
         logger.info(f'Using pre-trained weights from {cfg.TRAIN.WEIGHTS_PATH}')
@@ -79,11 +83,11 @@ def main():
 
     print(f'Start training model:')
     parameter_count = get_parameter_count(model)
-    logger.info(f'parameter count = {parameter_count}')
+    print(f'parameter count = {parameter_count}')
     # 4bytes x 3 (1model + 1gradient + 1optimiser)
     total_parameter_bytes = parameter_count * 12
-    logger.info(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
-    logger.info(f'from checkpoint = {checkpoint_path}')
+    print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
+    print(f'from checkpoint = {checkpoint_path}')
 
     model.train()
     if checkpoint_path is None:

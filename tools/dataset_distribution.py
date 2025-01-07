@@ -10,7 +10,7 @@ def main():
     with open(train_labels, 'rb') as f:
         data = json.load(f)
 
-    train_labels = os.path.join(dataset_path, 'Diving48_V2_train.json')
+    train_labels = os.path.join(dataset_path, 'Diving48_V2_test.json')
     with open(train_labels, 'rb') as f:
         test_data = json.load(f)
 
