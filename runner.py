@@ -6,13 +6,16 @@ import logging
 from tqdm import tqdm
 
 from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config
-from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count, load_checkpoint_compat
+from diveslowlearnfast.eval.run_eval_epoch import run_eval_epoch
+from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count, \
+    load_checkpoint_compat
 from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch, \
     MultigridSchedule
 from diveslowlearnfast.train import helper as train_helper
 
 logger = logging.getLogger(__name__)
+
 
 def set_log_level():
     logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
@@ -32,6 +35,8 @@ def print_device_props(device):
 def main():
     set_log_level()
     args = parse_args()
+    is_eval_enabled = args.EVAL.ENABLED
+    is_train_enabled = args.TRAIN.ENABLED
     config_path = os.path.join(args.TRAIN.RESULT_DIR, 'config.json')
 
     if os.path.exists(config_path):
@@ -43,6 +48,11 @@ def main():
         cfg = args
         dict_cfg = to_dict(copy.deepcopy(cfg))
         save_config(dict_cfg, config_path)
+
+    # always override these settings, so we can reuse the config that was saved on disk but have different
+    # behaviour depending on whether one of these was enabled
+    cfg.EVAL.ENABLED = is_eval_enabled
+    cfg.TRAIN.ENABLED = is_train_enabled
 
     dict_cfg = to_dict(copy.deepcopy(cfg))
     print(dict_cfg)
@@ -62,7 +72,8 @@ def main():
     criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
 
     if cfg.DATA.THRESHOLD > 0 and train_dataset.num_classes != cfg.MODEL.NUM_CLASSES:
-        logger.info(f'Threshold set and actual num_classes is less than specified in the config, updating to: {train_dataset.num_classes}.')
+        logger.info(
+            f'Threshold set and actual num_classes is less than specified in the config, updating to: {train_dataset.num_classes}.')
         cfg.MODEL.NUM_CLASSES = train_dataset.num_classes
 
     # If there is a checkpoint_path it is not worth using these weights
@@ -89,6 +100,16 @@ def main():
     total_parameter_bytes = parameter_count * 12
     print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
     print(f'from checkpoint = {checkpoint_path}')
+
+    if cfg.EVAL.ENABLED and checkpoint_path:
+        eval_stats = {}
+        logger.info('Running eval epoch')
+        stats = run_eval_epoch(model, criterion, test_loader, device, cfg, eval_stats)
+        print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
+        save_stats(stats, cfg.EVAL.RESULT_DIR)
+
+    if not cfg.TRAIN.ENABLED:
+        return
 
     model.train()
     if checkpoint_path is None:
@@ -117,7 +138,8 @@ def main():
                     checkpoint_path,
                     device
                 )
-            logger.info(f'multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
+            logger.info(
+                f'multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
 
         train_acc, train_loss = run_train_epoch(
             model,

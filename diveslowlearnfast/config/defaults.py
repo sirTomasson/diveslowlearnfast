@@ -126,6 +126,7 @@ class MultiGridConfig:
 
 @dataclass
 class TrainConfig:
+    ENABLED: bool = True
     BATCH_SIZE: int = 4
     MACRO_BATCH_SIZE: int = 256
     CHECKPOINT_PERIOD: int = 10
@@ -134,6 +135,12 @@ class TrainConfig:
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
     WEIGHTS_PATH: str = ''
+
+
+@dataclass
+class EvalConfig:
+    ENABLED: bool = False
+    RESULT_DIR: Path = Path('results/eval')
 
 
 @dataclass
@@ -172,3 +179,4 @@ class Config:
     DATA_LOADER: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     RAND_AUGMENT: RandAugmentConfig = field(default_factory=RandAugmentConfig)
     RANDOM_ROTATE: RandomRotateConfig = field(default_factory=RandomRotateConfig)
+    EVAL: EvalConfig = field(default_factory=EvalConfig)
