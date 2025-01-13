@@ -19,7 +19,7 @@ def run_eval_epoch(model: nn.Module,
                    labels,
                    stats):
     loader_iter = iter(loader)
-    eval_bar = tqdm(range(len(loader)), desc='Eval batch')
+    eval_bar = tqdm(range(4), desc='Eval batch')
     model.eval()
     Y_true = []
     Y_pred = []
@@ -36,14 +36,16 @@ def run_eval_epoch(model: nn.Module,
         loss = criterion(o, yb)
         ypred = o.argmax(dim=-1)
         Y_true.append(yb.detach().cpu().numpy())
-        Y_true.append(ypred.detach().cpu().numpy())
+        Y_pred.append(ypred.detach().cpu().numpy())
         losses.append(loss.item())
 
-    Y_true = np.stack(Y_true)
-    Y_pred = np.stack(Y_pred)
+    Y_true = np.stack(Y_true).reshape(-1)
+    Y_pred = np.stack(Y_pred).reshape(-1)
+    print(Y_true[:5])
+    print(Y_pred[:5])
     acc = (Y_true == Y_pred).sum() / len(Y_true)
     precision, recall, f1, _ = precision_recall_fscore_support(Y_true, Y_pred, average='macro')
-    cnf_mat = confusion_matrix(Y_true, Y_pred, labels)
+    cnf_mat = confusion_matrix(Y_true, Y_pred, labels=labels)
     loss = np.mean(losses)
     stats['eval'] = {
         'acc': acc,

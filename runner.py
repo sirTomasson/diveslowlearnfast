@@ -37,6 +37,7 @@ def main():
     args = parse_args()
     is_eval_enabled = args.EVAL.ENABLED
     is_train_enabled = args.TRAIN.ENABLED
+    eval_result_dir = args.EVAL.RESULT_DIR
     config_path = os.path.join(args.TRAIN.RESULT_DIR, 'config.json')
 
     if os.path.exists(config_path):
@@ -52,6 +53,7 @@ def main():
     # always override these settings, so we can reuse the config that was saved on disk but have different
     # behaviour depending on whether one of these was enabled
     cfg.EVAL.ENABLED = is_eval_enabled
+    cfg.EVAL.RESULT_DIR = eval_result_dir
     cfg.TRAIN.ENABLED = is_train_enabled
 
     dict_cfg = to_dict(copy.deepcopy(cfg))
@@ -104,7 +106,7 @@ def main():
     if cfg.EVAL.ENABLED and checkpoint_path:
         eval_stats = {}
         logger.info('Running eval epoch')
-        stats = run_eval_epoch(model, criterion, test_loader, device, cfg, eval_stats)
+        stats = run_eval_epoch(model, criterion, test_loader, device, cfg, train_dataset.labels, eval_stats)
         print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
         save_stats(stats, cfg.EVAL.RESULT_DIR)
 
