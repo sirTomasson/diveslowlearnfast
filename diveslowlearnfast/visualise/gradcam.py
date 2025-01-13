@@ -32,9 +32,9 @@ def revert_tensor_normalize(tensor, mean, std):
         mean (tensor or list): mean value to add.
         std (tensor or list): std to multiply.
     """
-    if type(mean) == list:
+    if type(mean) == list or type(mean) == tuple:
         mean = torch.tensor(mean)
-    if type(std) == list:
+    if type(std) == list or type(std) == tuple:
         std = torch.tensor(std)
     tensor = tensor * std
     tensor = tensor + mean
