@@ -19,7 +19,7 @@ def run_eval_epoch(model: nn.Module,
                    labels,
                    stats):
     loader_iter = iter(loader)
-    eval_bar = tqdm(range(4), desc='Eval batch')
+    eval_bar = tqdm(range(len(loader)), desc='Eval batch')
     model.eval()
     Y_true = []
     Y_pred = []
