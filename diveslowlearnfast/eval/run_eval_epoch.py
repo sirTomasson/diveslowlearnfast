@@ -51,6 +51,7 @@ def run_eval_epoch(model: nn.Module,
         'precision': precision,
         'recall': recall,
         'f1': f1,
-        'confusion_matrix': cnf_mat.tolist()
+        'confusion_matrix': cnf_mat.tolist(),
+        'labels': labels
     }
     return stats

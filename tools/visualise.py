@@ -68,7 +68,7 @@ def display_all(stats_path, **kwargs):
 
 def plot_confusion_matrix(confusion_matrix, save_path=None, **_kwargs):
     # Visualizing the confusion matrix using matplotlib
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(12, 10))
     plt.imshow(confusion_matrix, interpolation='nearest', cmap="Blues")
     plt.title("Confusion Matrix")
     plt.colorbar()
@@ -88,12 +88,63 @@ def plot_confusion_matrix(confusion_matrix, save_path=None, **_kwargs):
         plt.savefig(save_path)
     plt.show()
 
+
+def plot_per_class_accuracy(confusion_matrix, stats_path):
+
+    # to avoid divide by zero
+    totals = np.array(confusion_matrix.sum(axis=1)) + 1e-9
+    diagonals = np.array(confusion_matrix.diagonal())
+    per_class_accuracy = (diagonals / totals) * 100
+
+    plt.figure(figsize=(15, 10))
+
+    plt.xticks(np.arange(len(confusion_matrix)), labels=np.arange(len(confusion_matrix)), rotation=45, ha='right')
+    plt.bar(range(len(per_class_accuracy)), per_class_accuracy, width=0.8)
+
+    ax1 = plt.gca()
+    ax2 = plt.twiny()
+    ax2.set_xlim(ax1.get_xlim())  # Match limits of bottom axis
+    ax2.set_xticks(np.arange(len(confusion_matrix)))
+    ax2.set_xticklabels([f'{val:.0f}' for val in per_class_accuracy], rotation=45, ha='right')
+    ax2.set_xlabel('Accuracy (%)')
+    ax_right = ax1.twinx()
+    ax_right.plot(range(len(totals)), totals, 'r-', alpha=0)  # Invisible line to set scale
+    ax_right.set_ylabel('Number of Samples')
+    ax_right.bar(range(len(totals)), totals, width=0.8,
+                 color='lightgray', alpha=0.5)
+
+    ax1.set_ylim(0, 100)
+    ax1.set_ylabel('Accuracy (%)')
+    ax1.set_xlabel('Class ID')
+
+    # Create custom legend
+    import matplotlib.patches as mpatches
+
+    accuracy_patch = mpatches.Patch(color='C0', label='Accuracy')
+    samples_patch = mpatches.Patch(color='lightgray', alpha=0.5, label='Number of Samples')
+
+    # Add legend with custom entries and positioning
+    ax1.legend(handles=[accuracy_patch, samples_patch],
+               loc='upper right',  # Position
+               bbox_to_anchor=(1, 1),  # Fine-tune position
+               frameon=True,  # Show legend frame
+               framealpha=1.0,  # Frame opacity
+               edgecolor='black')  # Frame color
+    plt.grid(axis='y')
+    plt.tight_layout()
+    plt.savefig(stats_path.parent / 'per_class_accuracy.png')
+    plt.show()
+
+
 def eval_stats(stats_path, **_kwargs):
     with open(stats_path, 'rb') as f:
         stats = json.load(f)['eval']
 
     save_path = stats_path.parent / 'confusion_matrix.png'
-    plot_confusion_matrix(stats['confusion_matrix'], save_path)
+    confusion_matrix = np.array(stats['confusion_matrix'])
+    plot_confusion_matrix(confusion_matrix, save_path)
+    plot_per_class_accuracy(confusion_matrix, save_path)
+
     acc, precision, recall, f1 = stats['acc'], stats['precision'], stats['recall'], stats['f1']
 
     # Plotting accuracy, precision, recall, and f1 in a 2x2 matrix
@@ -103,7 +154,7 @@ def eval_stats(stats_path, **_kwargs):
     fig.suptitle("Evaluation Metrics")
 
     for ax, (metric_name, value) in zip(axes.ravel(), metrics.items()):
-        ax.bar([metric_name], [value], color='blue')
+        ax.bar([metric_name], [value], color='C0')
         ax.set_ylim(0, 1)
         ax.set_title(metric_name)
         ax.grid(axis='y')
@@ -112,8 +163,7 @@ def eval_stats(stats_path, **_kwargs):
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(stats_path.parent / 'eval_metrics.png')
     plt.show()
- 
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
