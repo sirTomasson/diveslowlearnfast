@@ -89,17 +89,20 @@ def plot_confusion_matrix(confusion_matrix, save_path=None, **_kwargs):
     plt.show()
 
 
-def plot_per_class_accuracy(confusion_matrix, stats_path):
+def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
+
 
     # to avoid divide by zero
     totals = np.array(confusion_matrix.sum(axis=1)) + 1e-9
     diagonals = np.array(confusion_matrix.diagonal())
     per_class_accuracy = (diagonals / totals) * 100
+    if labels:
+        labels = range(len(per_class_accuracy))
 
     plt.figure(figsize=(15, 10))
 
     plt.xticks(np.arange(len(confusion_matrix)), labels=np.arange(len(confusion_matrix)), rotation=45, ha='right')
-    plt.bar(range(len(per_class_accuracy)), per_class_accuracy, width=0.8)
+    plt.bar(labels, per_class_accuracy, width=0.8)
 
     ax1 = plt.gca()
     ax2 = plt.twiny()
@@ -110,7 +113,7 @@ def plot_per_class_accuracy(confusion_matrix, stats_path):
     ax_right = ax1.twinx()
     ax_right.plot(range(len(totals)), totals, 'r-', alpha=0)  # Invisible line to set scale
     ax_right.set_ylabel('Number of Samples')
-    ax_right.bar(range(len(totals)), totals, width=0.8,
+    ax_right.bar(labels, totals, width=0.8,
                  color='lightgray', alpha=0.5)
 
     ax1.set_ylim(0, 100)
@@ -150,16 +153,18 @@ def eval_stats(stats_path, **_kwargs):
     # Plotting accuracy, precision, recall, and f1 in a 2x2 matrix
     metrics = {'Accuracy': acc, 'Precision': precision, 'Recall': recall, 'F1-Score': f1}
 
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Evaluation Metrics")
+    bars = plt.bar(metrics.keys(), metrics.values(), label=metrics)
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2., height,
+                 f'{height:.2f}',
+                 ha='center', va='bottom')
 
-    for ax, (metric_name, value) in zip(axes.ravel(), metrics.items()):
-        ax.bar([metric_name], [value], color='C0')
-        ax.set_ylim(0, 1)
-        ax.set_title(metric_name)
-        ax.grid(axis='y')
-        ax.set_ylabel('Score')
-
+    plt.title('Metrics')
+    plt.ylim(0, 1)
+    plt.grid(axis='y')
+    plt.xlabel('Metric')
+    plt.ylabel('Score (0-1)')
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig(stats_path.parent / 'eval_metrics.png')
     plt.show()
