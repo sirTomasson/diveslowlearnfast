@@ -108,15 +108,7 @@ def get_include_labels(cfg):
     ).labels
 
 
-def get_train_objects(cfg, model):
-    criterion = torch.nn.CrossEntropyLoss()
-    optimiser = torch.optim.SGD(
-        model.parameters(),
-        lr=cfg.SOLVER.BASE_LR,
-        momentum=cfg.SOLVER.MOMENTUM,
-        weight_decay=cfg.SOLVER.WEIGHT_DECAY,
-    )
-
+def get_train_loader_and_dataset(cfg):
     train_transform = get_train_transform(cfg)
 
     train_dataset = Diving48Dataset(
@@ -138,5 +130,17 @@ def get_train_objects(cfg, model):
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         shuffle=True,
     )
+    return train_loader, train_dataset
+
+def get_train_objects(cfg, model):
+    criterion = torch.nn.CrossEntropyLoss()
+    optimiser = torch.optim.SGD(
+        model.parameters(),
+        lr=cfg.SOLVER.BASE_LR,
+        momentum=cfg.SOLVER.MOMENTUM,
+        weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+    )
+
+    train_loader, train_dataset = get_train_loader_and_dataset(cfg)
 
     return criterion, optimiser, train_loader, train_dataset

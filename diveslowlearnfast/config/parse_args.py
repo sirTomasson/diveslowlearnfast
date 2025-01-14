@@ -1,8 +1,9 @@
 import argparse
 import unittest
 from dataclasses import is_dataclass
+from typing import get_type_hints, get_origin, get_args, Union
 
-from diveslowlearnfast.config.defaults import ConfigData, Config
+from diveslowlearnfast.config.defaults import Config
 
 
 def dict_to_namespace(d) -> Config:
@@ -21,8 +22,20 @@ def int_list(comma_seperated):
 def as_list(comma_seperated):
     return [x for x in comma_seperated.split(',')]
 
+def get_base_type(type_hint):
+    """Extract the base type from a type hint, handling Union types."""
+    # Handle Union types (including Optional)
+    if get_origin(type_hint) is Union:
+        # Get all types excluding None
+        types = [t for t in get_args(type_hint) if t is not type(None)]
+        if types:
+            return types[0]  # Return the first non-None type
+    # Return the original type if it's not a Union
+    return type_hint
+
 def include_config_in_parser(cfg, parser, namespace=None):
     cfg_dict = cfg.__dict__
+    type_hints = get_type_hints(cfg.__class__)
     for k, v in cfg_dict.items():
         if is_dataclass(v):
             include_config_in_parser(v, parser, namespace=k)

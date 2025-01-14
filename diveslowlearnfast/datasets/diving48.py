@@ -128,7 +128,9 @@ class Diving48Dataset(Dataset):
             labels_2_vids[item['label']].append(item)
 
         # set the seed so we take the same sample everytime
-        rng = np.random.default_rng(seed=self.seed)
+        # -1 is a special case where it should be None
+        seed = self.seed if self.seed != -1 else None
+        rng = np.random.default_rng(seed=seed)
         data = []
         vocab = {}
         for k, v in labels_2_vids.items():

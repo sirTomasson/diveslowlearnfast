@@ -126,6 +126,12 @@ def main():
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
+        # if the threshold is set and the seed is None we want to reload the dataset and loader at each epoch
+        # this will ensure a new sample from the dataset with the threshold is drawn so the model will see a higher
+        # variety of data.
+        if cfg.DATA.THRESHOLD != -1 and cfg.DATA.SEED == -1:
+            logger.info(f'Threshold = {cfg.DATA.THRESHOLD} and cfg.DATA.SEED == -1, reloading dataset and loader at epoch {epoch}')
+            train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
         if multigrid_schedule:
             cfg, changed = multigrid_schedule.update_long_cycle(cfg, epoch)

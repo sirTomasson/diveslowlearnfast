@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 @dataclass
-class ConfigData:
+class DataConfig:
     INPUT_CHANNEL_NUM: list[int] = field(
         default_factory=lambda: [3, 3]
     )
@@ -21,6 +21,7 @@ class ConfigData:
     TEMPORAL_RANDOM_OFFSET: int = 0
     MULTI_THREAD_DECODE: bool = False
     THRESHOLD: int = -1
+    SEED: int = -1
 
 @dataclass
 class RandAugmentConfig:
@@ -166,7 +167,7 @@ class DataLoaderConfig:
 @dataclass
 class Config:
     NUM_GPUS: int = 1
-    DATA: ConfigData = field(default_factory=ConfigData)
+    DATA: DataConfig = field(default_factory=DataConfig)
     SLOWFAST: SlowFastConfig = field(default_factory=SlowFastConfig)
     RESNET: ResNetConfig = field(default_factory=ResNetConfig)
     NONLOCAL: NonLocalConfig = field(default_factory=NonLocalConfig)
