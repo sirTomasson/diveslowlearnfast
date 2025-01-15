@@ -11,14 +11,14 @@ import numpy as np
 from torch.utils.data import Dataset
 
 
-def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, **kwargs):
+def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
     import decord
     from decord import cpu
 
     vr = decord.VideoReader(video_path, ctx=cpu(0))
     num_frames = num_frames if num_frames <= len(vr) else len(vr)
     indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.uint32)
-    indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset)
+    indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
     frames = vr.get_batch(indices)
     return frames.asnumpy()
@@ -28,12 +28,31 @@ def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
 
+def wrap_around(offset_indices, total_frames):
+    result = []
+    for idx in offset_indices:
+        if idx > total_frames:
+            diff = abs(offset_indices[-1] - offset_indices[-2])
+            print(diff, result[0], result[1])
+            result.insert(0, result[0] - diff)
+        else:
+            result.append(idx)
 
-def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0):
+    return np.clip(result, 0, total_frames)
+
+
+def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_sampling_ratio=False):
     if temporal_random_offset == 0:
         return indices
 
-    return np.clip(math.floor(random.uniform(0, temporal_random_offset)) + indices, 0, total_frames)
+    if use_sampling_ratio:
+        # ratio between total number frames and number of frames being sampled
+        # total_frames/num_frames is the minimum by which we need to shift the indices in order to cover all frames
+        # across different epochs. Calculating this dynamically may result in more stable behaviour.
+        temporal_random_offset = math.floor(total_frames / len(indices))
+
+    offset_indices = math.floor(random.uniform(0, temporal_random_offset)) + indices
+    return wrap_around(offset_indices, total_frames)
 
 
 def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter=0):
@@ -46,7 +65,7 @@ def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_r
 
 
 def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0,
-                            temporal_random_offset=0, **kwargs):
+                            temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
     """Efficiently load video frames using uniform sampling"""
     container = av.open(video_path)
     if multi_thread_decode:
@@ -57,7 +76,7 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
 
     # Calculate timestamps for uniform sampling
     indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.uint32)
-    indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset)
+    indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
     frames = []
 
@@ -90,7 +109,8 @@ class Diving48Dataset(Dataset):
                  multi_thread_decode=False,
                  threshold=-1,
                  seed=42,
-                 include_labels=None):
+                 include_labels=None,
+                 use_sampling_ratio=False):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -106,6 +126,7 @@ class Diving48Dataset(Dataset):
         self.threshold = threshold
         self.seed = seed
         self.include_labels = include_labels
+        self.use_sampling_ratio = use_sampling_ratio
         self._init_dataset()
 
     def _init_dataset(self):
@@ -157,7 +178,8 @@ class Diving48Dataset(Dataset):
                                  self.num_frames,
                                  self.temporal_random_jitter,
                                  self.temporal_random_offset,
-                                 multithread_decode=self.multi_thread_decode)
+                                 multithread_decode=self.multi_thread_decode,
+                                 use_sampling_ratio=self.use_sampling_ratio)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:
