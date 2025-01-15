@@ -42,7 +42,7 @@ def wrap_around(offset_indices, total_frames):
 
 
 def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_sampling_ratio=False):
-    if temporal_random_offset == 0:
+    if temporal_random_offset == 0 and not use_sampling_ratio:
         return indices
 
     if use_sampling_ratio:
