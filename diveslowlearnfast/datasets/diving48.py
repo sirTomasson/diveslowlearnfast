@@ -5,11 +5,15 @@ import random
 import av
 import os
 import time
+import logging
 
 import numpy as np
 
 from torch.utils.data import Dataset
 
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
 
 def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
     import decord
@@ -17,7 +21,7 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
 
     vr = decord.VideoReader(video_path, ctx=cpu(0))
     num_frames = num_frames if num_frames <= len(vr) else len(vr)
-    indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.uint32)
+    indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.int32)
     indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
     frames = vr.get_batch(indices)
@@ -33,7 +37,6 @@ def wrap_around(offset_indices, total_frames):
     for idx in offset_indices:
         if idx > total_frames:
             diff = abs(offset_indices[-1] - offset_indices[-2])
-            print(diff, result[0], result[1])
             result.insert(0, result[0] - diff)
         else:
             result.append(idx)
@@ -50,6 +53,7 @@ def temporal_random_offset_indices(indices, total_frames, temporal_random_offset
         # total_frames/num_frames is the minimum by which we need to shift the indices in order to cover all frames
         # across different epochs. Calculating this dynamically may result in more stable behaviour.
         temporal_random_offset = math.floor(total_frames / len(indices))
+        logger.debug(f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
 
     offset_indices = math.floor(random.uniform(0, temporal_random_offset)) + indices
     return wrap_around(offset_indices, total_frames)
@@ -75,9 +79,10 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
     num_frames = total_frames if num_frames == -1 else num_frames
 
     # Calculate timestamps for uniform sampling
-    indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.uint32)
+    indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
     indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
+    logger.debug(f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
     frames = []
 
     for idx, frame in enumerate(container.decode(video=0)):
