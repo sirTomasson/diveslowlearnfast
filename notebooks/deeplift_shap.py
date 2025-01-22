@@ -19,8 +19,9 @@ class DeepLiftShap:
         self.model.eval()  # Set model to evaluation mode
 
     def attribute(self,
-                  input_tensors: Tuple[torch.Tensor, torch.Tensor],
+                  input_tensor: Tuple[torch.Tensor, torch.Tensor],
                   baselines: Tuple[torch.Tensor, torch.Tensor],
+                  mode: str = 'pixel',
                   target = None,
                   n_samples: int = 100):
         """
@@ -36,18 +37,18 @@ class DeepLiftShap:
         """
         # Randomly sample from background data
         logger.debug(f"Sampling {n_samples} background samples")
-        background_samples = (self._sample_background(baseline, n_samples) for baseline in baselines)
 
         # Compute scaled inputs
         logger.debug(f"Scaling input tensors and background samples using DeepLIFT rescale rule")
-        scaled_inputs = [self._get_scaled_inputs(input_tensor, background_sample) for input_tensor, background_sample in zip(input_tensors, background_samples)]
+        baselines = self._sample_background(baselines, n_samples)
+        scaled_inputs = self._get_scaled_inputs(input_tensor, baselines)
 
         # Compute attributions using DeepLIFT
         logger.debug(f"Computing DeepLIFT attributions")
         attributions = self._compute_deeplift_attributions(scaled_inputs, target)
 
         # Average attributions across samples, backgrounds, and channels
-        return [torch.mean(attribution, dim=[0, 1, 2]) for attribution in attributions]
+        return torch.mean(attributions, dim=[0, 1, 2])
 
     def _sample_background(self, background_data, n_samples: int) -> torch.Tensor:
         """Sample random background data points"""
@@ -65,7 +66,7 @@ class DeepLiftShap:
         Scale inputs between background and input data point
         Uses the rescale rule from DeepLIFT
         """
-        alphas = torch.linspace(0, 1, steps=3)
+        alphas = torch.linspace(0, 1, steps=5)
         scaled = torch.zeros(
             (len(alphas), len(background_samples)) + input_tensor.shape[1:]
         )
@@ -76,17 +77,17 @@ class DeepLiftShap:
         return scaled
 
     def _compute_deeplift_attributions(self,
-                                       scaled_inputs: torch.Tensor,
+                                       scaled_input: torch.Tensor,
                                        target: Optional[int]) -> torch.Tensor:
         """
         Compute DeepLIFT attributions for scaled inputs
         """
-        [scaled_input.requires_grad_(True) for scaled_input in scaled_inputs]
+        scaled_input.requires_grad_(True)
         self.model.zero_grad()
 
         # Forward pass
-        scaled_inputs_reshaped = [scaled_input.reshape(-1, *scaled_input.shape[2:]) for scaled_input in scaled_inputs]
-        logger.debug(f'Computing model outputs, input type = {type(scaled_inputs)}')
+        scaled_inputs_reshaped = scaled_input.reshape(-1, *scaled_input.shape[2:])
+        logger.debug(f'Computing model outputs, input type = {type(scaled_input)}')
         outputs = self.model(scaled_inputs_reshaped)
 
         if target is not None:
@@ -96,14 +97,14 @@ class DeepLiftShap:
 
         # Compute gradients
         logger.debug(f'Computing gradients for slow and fast input components')
-        gradients = [torch.autograd.grad(
+        gradients = torch.autograd.grad(
             outputs.sum(),
             scaled_input,
             create_graph=True
-        )[0] for scaled_input in scaled_inputs]
+        )[0]
 
         # Compute DeepLIFT attributions using the chain rule
-        attributions = [gradients * (scaled_input[-1] - scaled_input[0]) for gradients, scaled_input in zip(gradients, scaled_inputs)]
+        attributions = gradients * (scaled_input[-1] - scaled_input[0])
 
         return attributions
 
