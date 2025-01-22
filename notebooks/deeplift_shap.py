@@ -86,7 +86,6 @@ class DeepLiftShap:
 
         # Forward pass
         scaled_inputs_reshaped = [scaled_input.reshape(-1, *scaled_input.shape[2:]) for scaled_input in scaled_inputs]
-        print(scaled_inputs_reshaped[0].shape, scaled_inputs_reshaped[1].shape)
         logger.debug(f'Computing model outputs, input type = {type(scaled_inputs)}')
         outputs = self.model(scaled_inputs_reshaped)
 
@@ -104,8 +103,6 @@ class DeepLiftShap:
         )[0] for scaled_input in scaled_inputs]
 
         # Compute DeepLIFT attributions using the chain rule
-        print(gradients[0].shape, gradients[1].shape)
-
         attributions = [gradients * (scaled_input[-1] - scaled_input[0]) for gradients, scaled_input in zip(gradients, scaled_inputs)]
 
         return attributions
@@ -177,7 +174,7 @@ def main():
     max_val = torch.max(torch.abs(combined_maps))
     normalized_maps = combined_maps / (max_val + 1e-10)
     print(normalized_maps.shape)
-    plt.matshow(normalized_maps[0].detach().cpu().numpy())
+    plt.matshow(normalized_maps.detach().cpu().numpy()[0])
     plt.show()
 
 
