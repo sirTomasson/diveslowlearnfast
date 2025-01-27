@@ -96,7 +96,7 @@ def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
     totals = np.array(confusion_matrix.sum(axis=1)) + 1e-9
     diagonals = np.array(confusion_matrix.diagonal())
     per_class_accuracy = (diagonals / totals) * 100
-    if labels:
+    if not labels:
         labels = range(len(per_class_accuracy))
 
     plt.figure(figsize=(15, 10))
