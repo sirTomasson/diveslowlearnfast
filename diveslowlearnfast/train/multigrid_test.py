@@ -26,7 +26,7 @@ class SlowFastTest(unittest.TestCase):
         cfg = multigrid.init_multigrid(cfg)
         cfg, _ = multigrid.update_long_cycle(cfg, 0)
         model = SlowFast(cfg)
-        _, _, loader, diving48 = get_train_objects(cfg, model)
+        _, _, loader, diving48, scaler = get_train_objects(cfg, model)
         multigrid.set_dataset(diving48, cfg)
         xb, yb = next(iter(loader))
         self.assertEqual(xb.size(), torch.Size((32, 3, 8, 158, 158)))

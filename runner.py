@@ -71,7 +71,7 @@ def main():
         cfg = multigrid_schedule.init_multigrid(cfg)
 
     model = SlowFast(cfg).to(device)
-    criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
+    criterion, optimiser, train_loader, train_dataset, scaler = train_helper.get_train_objects(cfg, model)
 
     if cfg.DATA.THRESHOLD > 0 and train_dataset.num_classes != cfg.MODEL.NUM_CLASSES:
         logger.info(
@@ -136,7 +136,7 @@ def main():
         if multigrid_schedule:
             cfg, changed = multigrid_schedule.update_long_cycle(cfg, epoch)
             model = SlowFast(cfg).to(device)
-            criterion, optimiser, train_loader, train_dataset = train_helper.get_train_objects(cfg, model)
+            criterion, optimiser, train_loader, train_dataset, scaler = train_helper.get_train_objects(cfg, model)
             multigrid_schedule.set_dataset(train_dataset, cfg)
             checkpoint_path = last_checkpoint(cfg)
             if checkpoint_path:
@@ -156,7 +156,8 @@ def main():
             train_loader,
             device,
             cfg,
-            multigrid_schedule
+            multigrid_schedule,
+            scaler
         )
         epoch_bar.set_postfix({
             'acc': f'{train_acc:.3f}',

@@ -1,6 +1,7 @@
 import pytorchvideo
 import torch
 from pytorchvideo.transforms import Div255, RandAugment
+from torch.cpu.amp import GradScaler
 from torch.utils.data import DataLoader
 from torchvision.transforms.v2 import Compose
 
@@ -144,4 +145,8 @@ def get_train_objects(cfg, model):
 
     train_loader, train_dataset = get_train_loader_and_dataset(cfg)
 
-    return criterion, optimiser, train_loader, train_dataset
+    scaler = None
+    if cfg.TRAIN.AMP:
+        scaler = GradScaler()
+
+    return criterion, optimiser, train_loader, train_dataset, scaler

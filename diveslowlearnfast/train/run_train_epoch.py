@@ -3,7 +3,7 @@ import torch
 
 import numpy as np
 
-from torch import nn
+from torch import nn, autocast, GradScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -18,7 +18,8 @@ def run_train_epoch(model: nn.Module,
                     loader: DataLoader,
                     device,
                     cfg: Config,
-                    mutligrid_schedule: MultigridSchedule=None):
+                    mutligrid_schedule: MultigridSchedule=None,
+                    scaler: GradScaler=None):
     stats = Statistics()
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Train batch')
@@ -39,11 +40,23 @@ def run_train_epoch(model: nn.Module,
         # B x C x T / alpha x H x W
         xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
 
-        o = model([xb_slow, xb_fast])
-        current_loss = criterion(o, yb)
+        if scaler:
+            with autocast(device_type='cuda', dtype=torch.float16):
+                o = model([xb_slow, xb_fast])
+                current_loss = criterion(o, yb)
+        else:
+            o = model([xb_slow, xb_fast])
+            current_loss = criterion(o, yb)
+
+
         loss += current_loss.item()
         current_loss = current_loss / n_macro_batches
-        current_loss.backward()  # Backward pass without clearing gradients
+
+        # Backward pass without clearing gradients
+        if scaler:
+            scaler.scale(current_loss).backward()
+        else:
+            current_loss.backward()
 
         with torch.no_grad():  # Add no_grad for prediction
             ypred = o.argmax(dim=-1)
@@ -58,6 +71,10 @@ def run_train_epoch(model: nn.Module,
 
         # if we have completed a sufficient number of macro batches, or it is the last batch
         if (i+1) % n_macro_batches == 0 or (i+1) == len(loader):
+            if scaler:
+                scaler.step(optimiser)
+                scaler.update()
+
             optimiser.step()
             optimiser.zero_grad()
 

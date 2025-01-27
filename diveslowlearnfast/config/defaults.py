@@ -138,6 +138,7 @@ class TrainConfig:
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
     WEIGHTS_PATH: str = ''
+    AMP: bool = False
 
 
 @dataclass
