@@ -1148,7 +1148,7 @@ class ResNetBasicStem(nn.Module):
             kernel,
             stride,
             padding,
-            inplace_relu=True,
+            inplace_relu=False,
             eps=1e-5,
             bn_mmt=0.1,
             norm_module=nn.BatchNorm3d,
@@ -1946,6 +1946,7 @@ class SlowFast(nn.Module):
                 [temp_kernel[0][1][0] // 2, 3, 3],
             ],
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
         self.s1_fuse = FuseFastToSlow(
             width_per_group // cfg.SLOWFAST.BETA_INV,
@@ -1953,6 +1954,7 @@ class SlowFast(nn.Module):
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
         self.s2 = ResStage(
@@ -1977,6 +1979,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
         self.s2_fuse = FuseFastToSlow(
             width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
@@ -1984,6 +1987,7 @@ class SlowFast(nn.Module):
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
         for pathway in range(self.num_pathways):
@@ -2016,6 +2020,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
         self.s3_fuse = FuseFastToSlow(
             width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
@@ -2023,6 +2028,7 @@ class SlowFast(nn.Module):
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
         self.s4 = ResStage(
@@ -2047,6 +2053,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
         self.s4_fuse = FuseFastToSlow(
             width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
@@ -2054,6 +2061,7 @@ class SlowFast(nn.Module):
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
         self.s5 = ResStage(
@@ -2078,6 +2086,7 @@ class SlowFast(nn.Module):
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
             norm_module=self.norm_module,
+            inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
         if cfg.DETECTION.ENABLE:

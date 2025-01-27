@@ -103,6 +103,7 @@ class ModelConfig:
     HEAD_ACT: str = 'softmax'
     DETACH_FINAL_FC: bool = False
     FC_INIT_STD: float = 0.01
+    INPLACE_RELU: bool = True
 
 
 @dataclass
