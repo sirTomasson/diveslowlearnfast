@@ -12,7 +12,6 @@ from diveslowlearnfast.config import Config
 
 @torch.no_grad()
 def run_test_epoch(model: nn.Module,
-              criterion: nn.Module,
               loader: DataLoader,
               device,
               cfg: Config):
@@ -36,12 +35,10 @@ def run_test_epoch(model: nn.Module,
         xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
 
         o = model([xb_slow, xb_fast])
-        loss = criterion(o, yb)
         ypred = o.argmax(dim=-1)
         correct = (yb == ypred).cpu().detach().numpy().sum()
         acc = correct / len(yb)
         accuracies.append(acc)
-        losses.append(loss.item())
         batch_times.append(time.time() - start_time)
 
         avg_loader_time = np.mean(loader_times)
@@ -52,7 +49,6 @@ def run_test_epoch(model: nn.Module,
             'transform_time': f'{transform_times.numpy().mean():.2f}s',
             'batch_time': f'{avg_batch_time:.2f}s',
             'acc': f'{acc:.3f}',
-            'loss': f'{loss.item():.3f}',
         }
         batch_bar.set_postfix(postfix)
 

@@ -12,7 +12,6 @@ from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 
 @torch.no_grad()
 def run_eval_epoch(model: nn.Module,
-                   criterion: nn.Module,
                    loader: DataLoader,
                    device,
                    cfg: Config,
@@ -33,11 +32,9 @@ def run_eval_epoch(model: nn.Module,
         xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
 
         o = model([xb_slow, xb_fast])
-        loss = criterion(o, yb)
         ypred = o.argmax(dim=-1)
         Y_true.extend(yb.detach().cpu().numpy())
         Y_pred.extend(ypred.detach().cpu().numpy())
-        losses.append(loss.item())
 
     Y_true = np.array(Y_true)
     Y_pred = np.array(Y_pred)

@@ -176,7 +176,6 @@ def main():
             model.eval()
             test_acc, test_loss = run_test_epoch(
                 model,
-                criterion,
                 test_loader,
                 device,
                 cfg,
