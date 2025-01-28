@@ -104,6 +104,7 @@ class ModelConfig:
     DETACH_FINAL_FC: bool = False
     FC_INIT_STD: float = 0.01
     INPLACE_RELU: bool = False
+    COMPILE: bool = False
 
 
 @dataclass

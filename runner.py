@@ -113,6 +113,20 @@ def main():
     if not cfg.TRAIN.ENABLED:
         return
 
+    if cfg.MODEL.COMPILE:
+        gpu_ok = False
+        if torch.cuda.is_available():
+            device_cap = torch.cuda.get_device_capability()
+            if device_cap in ((7, 0), (8, 0), (9, 0)):
+                gpu_ok = True
+
+        if not gpu_ok:
+            logger.warning(
+                'GPU is not NVIDIA V100, A100, or H100. Speedup numbers may be lower '
+                'than expected.'
+            )
+        model = torch.compile(model, mode='reduce-overhead')
+
     model.train()
     if checkpoint_path is None:
         run_warmup(model, optimiser, criterion, train_loader, device, cfg)
