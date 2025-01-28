@@ -3,18 +3,19 @@ import torch
 
 import numpy as np
 
-from torch import nn
+from torch import nn, GradScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
-
+from diveslowlearnfast.train import helper as train_helper
 
 @torch.no_grad()
 def run_test_epoch(model: nn.Module,
               loader: DataLoader,
               device,
-              cfg: Config):
+              cfg: Config,
+              scaler: GradScaler=None):
 
     loader_times = []
     batch_times = []
@@ -29,12 +30,7 @@ def run_test_epoch(model: nn.Module,
 
         start_time = time.time()
         yb = yb.to(device)
-        xb_fast = xb[:].to(device)
-        # reduce the number of frames by the alpha ratio
-        # B x C x T / alpha x H x W
-        xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
-
-        o = model([xb_slow, xb_fast])
+        o = train_helper.forward(model, xb, device, cfg, scaler)
         ypred = o.argmax(dim=-1)
         correct = (yb == ypred).cpu().detach().numpy().sum()
         acc = correct / len(yb)

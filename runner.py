@@ -106,7 +106,7 @@ def main():
     if cfg.EVAL.ENABLED and checkpoint_path:
         eval_stats = {}
         logger.info('Running eval epoch')
-        stats = run_eval_epoch(model, criterion, test_loader, device, cfg, train_dataset.labels, eval_stats)
+        stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, scaler)
         print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
         save_stats(stats, cfg.EVAL.RESULT_DIR)
 
@@ -180,6 +180,7 @@ def main():
                 test_loader,
                 device,
                 cfg,
+                scaler,
             )
             model.train()
             stats['test_losses'].append(test_loss)

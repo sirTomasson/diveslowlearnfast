@@ -1,6 +1,7 @@
 import pytorchvideo
 import torch
 from pytorchvideo.transforms import Div255, RandAugment
+from torch import autocast
 from torch.cpu.amp import GradScaler
 from torch.utils.data import DataLoader
 from torchvision.transforms.v2 import Compose
@@ -134,6 +135,7 @@ def get_train_loader_and_dataset(cfg):
     )
     return train_loader, train_dataset
 
+
 def get_train_objects(cfg, model):
     criterion = torch.nn.CrossEntropyLoss()
     optimiser = torch.optim.SGD(
@@ -150,3 +152,23 @@ def get_train_objects(cfg, model):
         scaler = GradScaler()
 
     return criterion, optimiser, train_loader, train_dataset, scaler
+
+
+def forward(model, xb, device, cfg, scaler=None):
+    xb_fast = xb[:].to(device)
+    # reduce the number of frames by the alpha ratio
+    # B x C x T / alpha x H x W
+    xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
+
+    if scaler and torch.cuda.is_available():
+        with autocast(device_type='cuda', dtype=torch.float16):
+            return model([xb_slow, xb_fast])
+
+    return model([xb_slow, xb_fast])
+
+
+def backward(loss, scaler=None):
+    if scaler:
+        return scaler.scale(loss).backward()
+
+    return loss.backward()

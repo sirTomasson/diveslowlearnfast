@@ -2,11 +2,13 @@ import torch
 
 import numpy as np
 
-from torch import nn
+from torch import nn, GradScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.train import helper as train_helper
+
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 
 
@@ -16,7 +18,8 @@ def run_eval_epoch(model: nn.Module,
                    device,
                    cfg: Config,
                    labels,
-                   stats):
+                   stats,
+                   scaler: GradScaler = None):
     loader_iter = iter(loader)
     eval_bar = tqdm(range(len(loader)), desc='Eval batch')
     model.eval()
@@ -26,12 +29,7 @@ def run_eval_epoch(model: nn.Module,
     for _ in eval_bar:
         xb, yb, io_times, transform_times = next(loader_iter)
         yb = yb.to(device)
-        xb_fast = xb[:].to(device)
-        # reduce the number of frames by the alpha ratio
-        # B x C x T / alpha x H x W
-        xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
-
-        o = model([xb_slow, xb_fast])
+        o = train_helper.forward(model, xb, device, cfg, scaler)
         ypred = o.argmax(dim=-1)
         Y_true.extend(yb.detach().cpu().numpy())
         Y_pred.extend(ypred.detach().cpu().numpy())

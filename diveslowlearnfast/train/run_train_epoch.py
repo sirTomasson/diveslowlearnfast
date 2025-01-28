@@ -11,6 +11,8 @@ from diveslowlearnfast.config import Config
 from diveslowlearnfast.train.multigrid import MultigridSchedule
 from diveslowlearnfast.train.stats import Statistics
 
+from diveslowlearnfast.train import helper as train_helper
+
 
 def run_train_epoch(model: nn.Module,
                     criterion: nn.Module,
@@ -35,28 +37,12 @@ def run_train_epoch(model: nn.Module,
         start_time = time.time()
 
         yb = yb.to(device)
-        xb_fast = xb[:].to(device)
-        # reduce the number of frames by the alpha ratio
-        # B x C x T / alpha x H x W
-        xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
-
-        if scaler:
-            with autocast(device_type='cuda', dtype=torch.float16):
-                o = model([xb_slow, xb_fast])
-                current_loss = criterion(o, yb)
-        else:
-            o = model([xb_slow, xb_fast])
-            current_loss = criterion(o, yb)
-
+        o = train_helper.forward(model, xb, device, cfg, scaler)
+        current_loss = criterion(o, yb)
 
         loss += current_loss.item()
         current_loss = current_loss / n_macro_batches
-
-        # Backward pass without clearing gradients
-        if scaler:
-            scaler.scale(current_loss).backward()
-        else:
-            current_loss.backward()
+        train_helper.backward(current_loss, scaler)
 
         with torch.no_grad():  # Add no_grad for prediction
             ypred = o.argmax(dim=-1)
