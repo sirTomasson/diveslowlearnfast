@@ -5,9 +5,12 @@ import pandas as pd
 
 
 class PerSampleStatistics:
-    def __init__(self):
+    def __init__(self, path=None):
         super().__init__()
-        self.df = pd.DataFrame({'video_id': [], 'n_correct': [], 'total': [], 'class_id': []})
+        if path:
+            self.df = pd.read_pickle(path)
+        else:
+            self.df = pd.DataFrame({'video_id': [], 'n_correct': [], 'total': [], 'class_id': []})
 
     def update(self, video_ids, y_pred, y_true):
         n_corrects = np.uint8(y_pred == y_true)
