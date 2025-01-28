@@ -27,10 +27,10 @@ def init_model(cfg, device):
     return SlowFast(cfg).to(device)
 
 
-def generate_data(n_samples, device):
+def generate_data(n_samples):
     # B x C x T x H x W
-    xb = torch.randn((n_samples, 3, 16, 224, 224), device=device)
-    yb = torch.randn((48, n_samples), device=device)
+    xb = torch.randn((n_samples, 3, 16, 224, 224))
+    yb = torch.randn((n_samples, 48))
     return xb, yb
 
 def main():
@@ -41,12 +41,21 @@ def main():
             gpu_ok = True
 
     if not gpu_ok:
-        logger.warn(
+        logger.warning(
             "GPU is not NVIDIA V100, A100, or H100. Speedup numbers may be lower "
             "than expected."
         )
 
+    # Check if CUDA is available
+    if torch.cuda.is_available():
+        # Get the name of the current GPU device
+        print(f'GPU Name: {torch.cuda.get_device_name(0)}')
+    else:
+        print("No GPU available")
+
     cfg = Config()
+    cfg.SLOWFAST.ALPHA = 4
+    cfg.DATA.DATASET_PATH = '/home/s2871513/Datasets/Diving48'
     N_ITERS = 10
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = init_model(cfg, device)
@@ -54,14 +63,16 @@ def main():
 
     def train(mod, xb, yb):
         optimiser.zero_grad(True)
-        pred = train_helper.forward(mod, xb, train_helper, cfg, device)
+        pred = train_helper.forward(mod, xb, device, cfg)
         loss = criterion(pred, yb)
         loss.backward()
         optimiser.step()
 
     eager_times = []
     for i in range(N_ITERS):
-        xb, yb = generate_data(16, device)
+        xb, yb = generate_data(16)
+        train_helper.forward(model, xb, device, cfg)
+        print(xb.shape, yb.shape)
         _, eager_time = timed(lambda: train(model, xb, yb))
         eager_times.append(eager_time)
         print(f"eager train time {i}: {eager_time}")
@@ -72,7 +83,7 @@ def main():
 
     compile_times = []
     for i in range(N_ITERS):
-        xb, yb = generate_data(16, device)
+        xb, yb = generate_data(16)
         _, compile_time = timed(lambda: train(train_opt, xb, yb))
         compile_times.append(compile_time)
         print(f"compile train time {i}: {compile_time}")
