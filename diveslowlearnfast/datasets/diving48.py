@@ -200,7 +200,7 @@ class Diving48Dataset(Dataset):
         video_id = self.data[index]['vid_name']
         label = self.data[index]['label']
         frames, io_time, transform_time = self._read_frames(video_id)
-        return frames, label, io_time, transform_time
+        return frames, label, io_time, transform_time, video_id
 
     def __len__(self):
         return self.num_videos
