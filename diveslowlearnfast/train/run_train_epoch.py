@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.train.multigrid import MultigridSchedule
-from diveslowlearnfast.train.stats import Statistics
+from diveslowlearnfast.train.stats import Statistics, StatsDB
 
 from diveslowlearnfast.train import helper as train_helper
 
@@ -20,6 +20,8 @@ def run_train_epoch(model: nn.Module,
                     loader: DataLoader,
                     device,
                     cfg: Config,
+                    stats_db: StatsDB,
+                    epoch: int,
                     mutligrid_schedule: MultigridSchedule=None,
                     scaler: GradScaler=None):
     stats = Statistics()
@@ -32,7 +34,7 @@ def run_train_epoch(model: nn.Module,
     count = 0
     for i in batch_bar:
         start_time = time.time()
-        xb, yb, io_times, transform_times = next(loader_iter)
+        xb, yb, io_times, transform_times, video_ids = next(loader_iter)
         stats.update(loader_time=(time.time() - start_time))
         start_time = time.time()
 
@@ -45,8 +47,9 @@ def run_train_epoch(model: nn.Module,
         train_helper.backward(current_loss, scaler)
 
         with torch.no_grad():  # Add no_grad for prediction
-            ypred = o.argmax(dim=-1)
-            correct += (yb == ypred).cpu().numpy().sum()
+            ypred = o.argmax(dim=-1).detach().cpu().numpy()
+            ytrue = yb.detach().cpu().numpy()
+            correct += (ypred == ytrue).sum()
 
         stats.update(
             io_time=np.mean(io_times.numpy()),
@@ -71,6 +74,7 @@ def run_train_epoch(model: nn.Module,
             count = 0
             loss = 0
 
+        stats_db.update(video_ids, ypred, ytrue, str(cfg.TRAIN.RESULT_DIR), 'train', epoch)
         stats.update(batch_time=(time.time() - start_time))
 
         postfix = stats.get_formatted_stats(
@@ -85,7 +89,6 @@ def run_train_epoch(model: nn.Module,
             postfix['multigrid_short_cycle_crop_size'] = f'{mutligrid_schedule.get_short_cycle_crop_size(cfg)}'
 
         batch_bar.set_postfix(postfix)
-
 
     mean_accuracy = stats.mean_accuracy()
     mean_loss = stats.mean_loss()

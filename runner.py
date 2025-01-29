@@ -13,6 +13,7 @@ from diveslowlearnfast.models.utils import last_checkpoint
 from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, load_stats, run_test_epoch, \
     MultigridSchedule
 from diveslowlearnfast.train import helper as train_helper
+from diveslowlearnfast.train.stats import StatsDB
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +104,11 @@ def main():
     print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
     print(f'from checkpoint = {checkpoint_path}')
 
+    stats_db = StatsDB(cfg.TRAIN.STATS_DB)
     if cfg.EVAL.ENABLED and checkpoint_path:
         eval_stats = {}
         logger.info('Running eval epoch')
-        stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, scaler)
+        stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, stats_db, scaler)
         print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
         save_stats(stats, cfg.EVAL.RESULT_DIR)
 
@@ -170,35 +172,32 @@ def main():
             train_loader,
             device,
             cfg,
+            stats_db,
+            epoch,
             multigrid_schedule,
             scaler
         )
-        epoch_bar.set_postfix({
-            'acc': f'{train_acc:.3f}',
-            'train_loss': f'{train_loss:.3f}'
-        })
+        epoch_bar.set_postfix({ 'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}' })
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
-            save_checkpoint(model,
-                            optimiser,
-                            epoch,
-                            cfg)
+            save_checkpoint(model, optimiser, epoch, cfg)
 
-        stats['train_losses'].append(train_loss)
-        stats['train_accuracies'].append(train_acc)
+        stats['train_losses'].append(float(train_loss))
+        stats['train_accuracies'].append(float(train_acc))
 
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
             model.eval()
-            test_acc, test_loss = run_test_epoch(
+            test_acc = run_test_epoch(
                 model,
                 test_loader,
                 device,
                 cfg,
+                stats_db,
+                epoch,
                 scaler,
             )
             model.train()
-            stats['test_losses'].append(test_loss)
-            stats['test_accuracies'].append(test_acc)
+            stats['test_accuracies'].append(float(test_acc))
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
 

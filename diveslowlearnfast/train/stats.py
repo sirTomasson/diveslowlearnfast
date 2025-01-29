@@ -1,86 +1,81 @@
+import os
 import unittest
 
 import numpy as np
-import pandas as pd
+import sqlite3
 
-
-class PerSampleStatistics:
+class StatsDB:
     def __init__(self, path=None):
         super().__init__()
-        if path:
-            self.df = pd.read_pickle(path)
-        else:
-            self.df = pd.DataFrame({'video_id': [], 'n_correct': [], 'total': [], 'class_id': []})
+        self.con = sqlite3.connect(path)
+        cur = self.con.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS stats 
+        (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            epoch INTEGER, 
+            video_id TEXT, 
+            pred INTEGER, 
+            gt INTEGER, 
+            run_id TEXT, 
+            split TEXT
+        )
+        """)
+        self.con.commit()
 
-    def update(self, video_ids, y_pred, y_true):
-        n_corrects = np.uint8(y_pred == y_true)
-        class_ids = y_true
-        for video_id, n_correct, class_id in zip(video_ids, n_corrects, class_ids):
-            self._update_row(video_id, n_correct, class_id)
+    def update(self, video_ids, preds, gts, run_id, mode, epoch):
+        query = """INSERT INTO stats(epoch, video_id, pred, gt, run_id, split) 
+        VALUES(?, ?, ?, ?, ?, ?)
+        """
+        # explicitly cast to ints since the numpy definition is not supported by the db
+        data = [[epoch, video_id, int(pred), int(gt), run_id, mode] for video_id, pred, gt  in zip(video_ids, preds, gts)]
+        cur = self.con.cursor()
+        cur.executemany(query, data)
+        self.con.commit()
 
-    def _update_row(self, video_id: str, n_correct: int, class_id: int):
-        mask = self.df['video_id'] == video_id
-        if mask.any():
-            self.df.loc[mask, 'n_correct'] += n_correct
-            self.df.loc[mask, 'total'] += 1
-        else:
-            self.df.loc[len(self.df)] = [video_id, n_correct, 1, class_id]
 
-    def per_video_accuracy(self):
-        self.df['acc'] = self.df['n_correct'] / self.df['total']
-        return self.df
+    def execute_query(self, query, **kwargs):
+        return [list(row) for row in self.con.execute(query, kwargs)]
 
-    def accuracy(self):
-        return self.df['n_correct'].sum() / self.df['total'].sum()
-
-    def per_class_accuracy(self):
-        df = self.df.groupby(['class_id'])[['n_correct', 'total']].sum()
-        df['per_class_acc'] = df['n_correct'].sum() / df['total'].sum()
-        return df
-
-    def save(self, path):
-        self.df.to_pickle(path)
 
 
 class PerSampleStatisticsTest(unittest.TestCase):
 
     def test_update(self):
-        stats = PerSampleStatistics()
-        video_ids = ['1', '2', '3', '4']
-        y_pred = np.array([0, 1, 2, 2])
-        y_true = np.array([0, 0, 2, 1])
+        stats = StatsDB('./stats.db')
+        video_ids = ['1', '2', '3']
+        y_pred = [0, 5, 3]
+        y_true = [0, 5, 4]
+        epoch = 1
+        run_id = 'run1'
+        mode = 'train'
 
-        stats.update(video_ids, y_pred, y_true)
-        self.assertEqual(stats.per_video_accuracy().loc[0, 'acc'], 1.0)
-        self.assertEqual(stats.per_video_accuracy().loc[0, 'class_id'], 0)
-        self.assertEqual(stats.per_video_accuracy().loc[1, 'acc'], 0.0)
-        self.assertEqual(stats.per_video_accuracy().loc[1, 'class_id'], 0)
-        self.assertEqual(stats.per_video_accuracy().loc[2, 'acc'], 1.0)
-        self.assertEqual(stats.per_video_accuracy().loc[2, 'class_id'], 2)
-        self.assertEqual(stats.per_video_accuracy().loc[3, 'acc'], 0.0)
-        self.assertEqual(stats.per_video_accuracy().loc[3, 'class_id'], 1)
+        stats.update(video_ids, y_pred, y_true, run_id, mode, epoch)
+        query = """SELECT gt, (correct_n / n) as acc FROM(
+        SELECT
+            gt,
+            epoch,
+            CAST(SUM(CASE WHEN pred = gt THEN 1 ELSE 0 END) as REAL) as correct_n,
+            CAST(COUNT(*) as REAL) as n
+        FROM stats
+        GROUP BY gt);
+        """
+        per_class_accuracy = stats.execute_query(query)
+        self.assertEqual(per_class_accuracy, [[0, 1.0], [4, 0.0], [5, 1.0]])
 
-        self.assertEqual(stats.accuracy(), 0.5)
+        video_ids = ['2', '1', '3']
+        y_pred = [1, 0, 1]
+        y_true = [0, 0, 2]
+        epoch = 2
+        run_id = 'run1'
+        mode = 'train'
+        stats.update(video_ids, y_pred, y_true, run_id, mode, epoch)
+        per_class_accuracy = stats.execute_query(query)
+        self.assertEqual(per_class_accuracy, [[0, 0.6666666666666666], [2, 0.0], [4, 0.0], [5, 1.0]])
 
-        y_pred = np.array([0, 1, 2, 2])
-        y_true = np.array([0, 0, 1, 2])
+    def tearDown(self):
+        if os.path.exists('./stats.db'):
+            os.remove('./stats.db')
 
-        stats.update(video_ids, y_pred, y_true)
-        self.assertEqual(stats.per_video_accuracy().loc[0, 'acc'], 1.0)
-        self.assertEqual(stats.per_video_accuracy().loc[0, 'class_id'], 0)
-        self.assertEqual(stats.per_video_accuracy().loc[1, 'acc'], 0.0)
-        self.assertEqual(stats.per_video_accuracy().loc[1, 'class_id'], 0)
-        self.assertEqual(stats.per_video_accuracy().loc[2, 'acc'], 0.5)
-        self.assertEqual(stats.per_video_accuracy().loc[2, 'class_id'], 2)
-        self.assertEqual(stats.per_video_accuracy().loc[3, 'acc'], 0.5)
-        self.assertEqual(stats.per_video_accuracy().loc[3, 'class_id'], 1)
-
-        self.assertEqual(stats.accuracy(), 0.5)
-
-        per_class_acc_df = stats.per_class_accuracy()
-        self.assertEqual(per_class_acc_df.loc[0, 'per_class_acc'], 0.5)
-        self.assertEqual(per_class_acc_df.loc[1, 'per_class_acc'], 0.5)
-        self.assertEqual(per_class_acc_df.loc[2, 'per_class_acc'], 0.5)
 
 
 class Statistics:

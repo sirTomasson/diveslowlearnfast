@@ -138,6 +138,7 @@ class TrainConfig:
     EVAL_PERIOD: int = 10
     AUTO_RESUME: bool = True
     RESULT_DIR: Path = Path('results')
+    STATS_DB: Path = Path('results/stats.db')
     WEIGHTS_PATH: str = ''
     AMP: bool = False
 
