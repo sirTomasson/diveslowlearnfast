@@ -78,6 +78,7 @@ def main():
         print(f"eager train time {i}: {eager_time}")
     print("~" * 10)
 
+    torch.set_float32_matmul_precision('high')
     model = init_model(cfg, device)
     criterion, optimiser, *_ = train_helper.get_train_objects(cfg, model)
     train_opt = torch.compile(model, mode="reduce-overhead")
