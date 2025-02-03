@@ -1,10 +1,10 @@
 import pytorchvideo
 import torch
-from pytorchvideo.transforms import Div255, RandAugment
+from pytorchvideo.transforms import Div255, RandomShortSideScale
 from torch import autocast
-from torch.cpu.amp import GradScaler
+from torch.amp import GradScaler
 from torch.utils.data import DataLoader
-from torchvision.transforms.v2 import Compose
+from torchvision.transforms.v2 import Compose, RandomCrop
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
@@ -36,6 +36,11 @@ def get_train_transform(cfg: Config, crop_size=None):
         ToTensor4D(),
         Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
         Div255(),
+        RandomShortSideScale(
+            min_size=256,
+            max_size=320,
+        ),
+        RandomCrop(cfg.DATA.TRAIN_CROP_SIZE),
         pytorchvideo.transforms.create_video_transform(
             mode='train',
             num_samples=cfg.DATA.NUM_FRAMES,
