@@ -127,6 +127,7 @@ def main():
                 'GPU is not NVIDIA V100, A100, or H100. Speedup numbers may be lower '
                 'than expected.'
             )
+        torch.set_float32_matmul_precision('high')
         model = torch.compile(model, mode='reduce-overhead')
 
     model.train()
