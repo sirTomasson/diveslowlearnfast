@@ -66,14 +66,17 @@ def display_all(stats_path, **kwargs):
     plt.show()
 
 
-def plot_confusion_matrix(confusion_matrix, save_path=None, **_kwargs):
+def plot_confusion_matrix(confusion_matrix, save_path=None, labels=None, **_kwargs):
+    if not labels:
+        labels = np.arange(len(confusion_matrix))
+
     # Visualizing the confusion matrix using matplotlib
     plt.figure(figsize=(12, 10))
     plt.imshow(confusion_matrix, interpolation='nearest', cmap="Blues")
     plt.title("Confusion Matrix")
     plt.colorbar()
-    plt.xticks(np.arange(len(confusion_matrix)), labels=np.arange(len(confusion_matrix)))
-    plt.yticks(np.arange(len(confusion_matrix)), labels=np.arange(len(confusion_matrix)))
+    plt.xticks(np.arange(len(confusion_matrix)), labels=labels)
+    plt.yticks(np.arange(len(confusion_matrix)), labels=labels)
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
 
@@ -90,49 +93,53 @@ def plot_confusion_matrix(confusion_matrix, save_path=None, **_kwargs):
 
 
 def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
-
-
     # to avoid divide by zero
     totals = np.array(confusion_matrix.sum(axis=1)) + 1e-9
     diagonals = np.array(confusion_matrix.diagonal())
     per_class_accuracy = (diagonals / totals) * 100
+
     if not labels:
         labels = range(len(per_class_accuracy))
 
+    # Create continuous indices and map them to actual labels
+    continuous_indices = range(len(labels))
+
     plt.figure(figsize=(15, 10))
 
-    plt.xticks(np.arange(len(confusion_matrix)), labels=np.arange(len(confusion_matrix)), rotation=45, ha='right')
-    plt.bar(labels, per_class_accuracy, width=0.8)
-
+    # Create main axes
     ax1 = plt.gca()
-    ax2 = plt.twiny()
-    ax2.set_xlim(ax1.get_xlim())  # Match limits of bottom axis
-    ax2.set_xticks(np.arange(len(confusion_matrix)))
-    ax2.set_xticklabels([f'{val:.0f}' for val in per_class_accuracy], rotation=45, ha='right')
-    ax2.set_xlabel('Accuracy (%)')
-    ax_right = ax1.twinx()
-    ax_right.plot(range(len(totals)), totals, 'r-', alpha=0)  # Invisible line to set scale
-    ax_right.set_ylabel('Number of Samples')
-    ax_right.bar(labels, totals, width=0.8,
-                 color='lightgray', alpha=0.5)
-
+    ax1.bar(continuous_indices, per_class_accuracy, width=0.8, color='C0')
+    ax1.set_xticks(continuous_indices)
+    ax1.set_xticklabels(labels, rotation=45, ha='right')
     ax1.set_ylim(0, 100)
     ax1.set_ylabel('Accuracy (%)')
     ax1.set_xlabel('Class ID')
 
+    # Create top x-axis with same transform as bottom axis
+    ax2 = ax1.twiny()
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(continuous_indices)
+    ax2.set_xticklabels([f'{val:.0f}' for val in per_class_accuracy], rotation=45, ha='right')
+    ax2.set_xlabel('Accuracy (%)')
+
+    # Create right y-axis for sample counts
+    ax_right = ax1.twinx()
+    ax_right.set_ylabel('Number of Samples')
+    ax_right.bar(continuous_indices, totals, width=0.8, color='lightgray', alpha=0.5)
+
     # Create custom legend
     import matplotlib.patches as mpatches
-
     accuracy_patch = mpatches.Patch(color='C0', label='Accuracy')
     samples_patch = mpatches.Patch(color='lightgray', alpha=0.5, label='Number of Samples')
 
-    # Add legend with custom entries and positioning
+    # Add legend
     ax1.legend(handles=[accuracy_patch, samples_patch],
-               loc='upper right',  # Position
-               bbox_to_anchor=(1, 1),  # Fine-tune position
-               frameon=True,  # Show legend frame
-               framealpha=1.0,  # Frame opacity
-               edgecolor='black')  # Frame color
+               loc='upper right',
+               bbox_to_anchor=(1, 1),
+               frameon=True,
+               framealpha=1.0,
+               edgecolor='black')
+
     plt.grid(axis='y')
     plt.tight_layout()
     plt.savefig(stats_path.parent / 'per_class_accuracy.png')
@@ -145,8 +152,9 @@ def eval_stats(stats_path, **_kwargs):
 
     save_path = stats_path.parent / 'confusion_matrix.png'
     confusion_matrix = np.array(stats['confusion_matrix'])
-    plot_confusion_matrix(confusion_matrix, save_path)
-    plot_per_class_accuracy(confusion_matrix, save_path)
+    labels = stats['labels']
+    plot_confusion_matrix(confusion_matrix, save_path, labels)
+    plot_per_class_accuracy(confusion_matrix, save_path, labels)
 
     acc, precision, recall, f1 = stats['acc'], stats['precision'], stats['recall'], stats['f1']
 
