@@ -4,7 +4,7 @@ from pytorchvideo.transforms import Div255
 from torch import autocast
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
-from torchvision.transforms.v2 import Compose, RandomCrop
+from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
@@ -42,18 +42,30 @@ def get_train_transform(cfg: Config, crop_size=None):
             max_size=320,
         ),
         RandomCrop(cfg.DATA.TRAIN_CROP_SIZE),
-        pytorchvideo.transforms.create_video_transform(
-            mode='train',
-            num_samples=cfg.DATA.NUM_FRAMES,
-            video_std=cfg.DATA.MEAN,
-            video_mean=cfg.DATA.STD,
-            convert_to_float=False,
-            crop_size=crop_size,
-            aug_type=get_aug_type(cfg),
-            aug_paras=get_aug_paras(cfg),
-            horizontal_flip_prob=0.5,
-        )
     ]
+
+    aug_type = get_aug_type(cfg)
+    if aug_type == 'randaug':
+        transformations.append(
+            pytorchvideo.transforms.create_video_transform(
+                mode='train',
+                num_samples=cfg.DATA.NUM_FRAMES,
+                video_std=cfg.DATA.MEAN,
+                video_mean=cfg.DATA.STD,
+                convert_to_float=False,
+                crop_size=crop_size,
+                aug_type=get_aug_type(cfg),
+                aug_paras=get_aug_paras(cfg),
+                horizontal_flip_prob=0.5,
+            )
+        )
+    else:
+        transformations.extend([
+            RandomCrop(cfg.DATA.TRAIN_CROP_SIZE),
+            Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+            RandomHorizontalFlip(p=0.5),
+        ])
+
     if cfg.RANDOM_ROTATE.ENABLED:
         angle = cfg.RANDOM_ROTATE.MAX_DEGREE
         transformations.extend([
@@ -159,7 +171,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg, model, video_ids=None):
+def get_train_objects(cfg: Config, model, device: torch.device):
     if cfg.EGL.ENABLED:
         criterion = RRRLoss()
     else:
@@ -179,8 +191,8 @@ def get_train_objects(cfg, model, video_ids=None):
         scaler = GradScaler()
 
     if cfg.MODEL.CLASS_WEIGHTS:
-        weights = train_dataset.get_inverted_class_weights()
-        criterion = torch.nn.CrossEntropyLoss(weight=weights)
+        weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)
+        criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
     else:
         criterion = torch.nn.CrossEntropyLoss()
 
