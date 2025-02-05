@@ -39,6 +39,7 @@ def main():
     is_eval_enabled = args.EVAL.ENABLED
     is_train_enabled = args.TRAIN.ENABLED
     eval_result_dir = args.EVAL.RESULT_DIR
+    checkpoint_filename = args.TRAIN.CHECKPOINT_FILENAME
     config_path = os.path.join(args.TRAIN.RESULT_DIR, 'config.json')
 
     if os.path.exists(config_path):
@@ -56,6 +57,8 @@ def main():
     cfg.EVAL.ENABLED = is_eval_enabled
     cfg.EVAL.RESULT_DIR = eval_result_dir
     cfg.TRAIN.ENABLED = is_train_enabled
+    if checkpoint_filename and len(checkpoint_filename) > 0:
+        cfg.TRAIN.CHECKPOINT_FILENAME = checkpoint_filename
 
     dict_cfg = to_dict(copy.deepcopy(cfg))
     print(dict_cfg)
@@ -111,6 +114,7 @@ def main():
         stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, stats_db, scaler)
         print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
         save_stats(stats, cfg.EVAL.RESULT_DIR)
+        return
 
     if not cfg.TRAIN.ENABLED:
         return
