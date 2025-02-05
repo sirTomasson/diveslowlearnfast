@@ -240,5 +240,5 @@ class Diving48Dataset(Dataset):
         # hacky way to add the class with missing weights
         counts = np.insert(counts, 30, 0)
         weights = counts / np.sum(counts)
-        inverted_weights = 1 / weights
+        inverted_weights = 1 - weights
         return inverted_weights / inverted_weights.sum()
