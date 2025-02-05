@@ -9,8 +9,10 @@ from glob import glob
 from diveslowlearnfast.config import Config
 
 
-def save_checkpoint(model, optimiser, epoch: int, cfg: Config):
-    if len(cfg.TRAIN.CHECKPOINT_FILENAME) > 0:
+def save_checkpoint(model, optimiser, epoch: int, cfg: Config, filename=None):
+    if filename:
+        path = os.path.join(cfg.TRAIN.RESULT_DIR, filename)
+    elif len(cfg.TRAIN.CHECKPOINT_FILENAME) > 0:
         path = os.path.join(cfg.TRAIN.RESULT_DIR, cfg.TRAIN.CHECKPOINT_FILENAME)
     else:
         path = os.path.join(cfg.TRAIN.RESULT_DIR, f'checkpoint_{epoch:04d}.pth')
