@@ -75,7 +75,7 @@ def main():
         cfg = multigrid_schedule.init_multigrid(cfg)
 
     model = SlowFast(cfg).to(device)
-    criterion, optimiser, train_loader, train_dataset, scaler = train_helper.get_train_objects(cfg, model)
+    criterion, optimiser, train_loader, train_dataset, scaler = train_helper.get_train_objects(cfg, model, device)
 
     if cfg.DATA.THRESHOLD > 0 and train_dataset.num_classes != cfg.MODEL.NUM_CLASSES:
         logger.info(
