@@ -252,3 +252,12 @@ class Diving48Dataset(Dataset):
             frames = self.transform_fn(frames)
 
         return frames
+
+    def get_inverted_class_weights(self):
+        labels = np.array(list(map(lambda x: x['label'], self.data)))
+        _, counts = np.unique(labels, return_counts=True)
+        # hacky way to add the class with missing weights
+        counts = np.insert(counts, 30, 0)
+        weights = counts / np.sum(counts)
+        inverted_weights = 1 / weights
+        return inverted_weights / inverted_weights.sum()

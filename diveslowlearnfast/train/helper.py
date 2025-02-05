@@ -178,6 +178,12 @@ def get_train_objects(cfg, model, video_ids=None):
     if cfg.TRAIN.AMP:
         scaler = GradScaler()
 
+    if cfg.MODEL.CLASS_WEIGHTS:
+        weights = train_dataset.get_inverted_class_weights()
+        criterion = torch.nn.CrossEntropyLoss(weight=weights)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+
     return criterion, optimiser, train_loader, train_dataset, scaler
 
 

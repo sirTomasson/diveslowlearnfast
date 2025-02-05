@@ -143,6 +143,12 @@ class Diving48DatasetTest(unittest.TestCase):
         self.assertGreater(diving48_test.num_videos, diving48_test2.num_videos)
         self.assertEqual(diving48_test2.labels, diving48_train.labels)
 
+    def test_get_inverted_class_weights(self):
+        diving48_train = Diving48Dataset(DATASET_PATH,
+                                         dataset_type='train',
+                                         num_frames=2)
+        self.assertEqual(len(diving48_train.get_inverted_class_weights()), 48)
+
     def test_include_video_ids(self):
         video_ids = ['8qRmKunCjtY_00016', 'CVAfPfVFulQ_00048', 'CVAfPfVFulQ_00040']
         diving48 = Diving48Dataset(
