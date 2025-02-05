@@ -141,7 +141,7 @@ def get_train_loader_and_dataset(cfg):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg, model):
+def get_train_objects(cfg: Config, model):
     criterion = torch.nn.CrossEntropyLoss()
     optimiser = torch.optim.SGD(
         model.parameters(),
@@ -155,6 +155,12 @@ def get_train_objects(cfg, model):
     scaler = None
     if cfg.TRAIN.AMP:
         scaler = GradScaler()
+
+    if cfg.MODEL.CLASS_WEIGHTS:
+        weights = train_dataset.get_inverted_class_weights()
+        criterion = torch.nn.CrossEntropyLoss(weight=weights)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
 
     return criterion, optimiser, train_loader, train_dataset, scaler
 

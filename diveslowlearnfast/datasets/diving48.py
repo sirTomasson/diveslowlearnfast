@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
 
-def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
+
+def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
+                      use_sampling_ratio=False, **kwargs):
     import decord
     from decord import cpu
 
@@ -31,6 +33,7 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
 def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
+
 
 def wrap_around(offset_indices, total_frames):
     result = []
@@ -53,7 +56,8 @@ def temporal_random_offset_indices(indices, total_frames, temporal_random_offset
         # total_frames/num_frames is the minimum by which we need to shift the indices in order to cover all frames
         # across different epochs. Calculating this dynamically may result in more stable behaviour.
         temporal_random_offset = math.floor(total_frames / len(indices))
-        logger.debug(f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
+        logger.debug(
+            f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
 
     offset_indices = math.floor(random.uniform(0, temporal_random_offset)) + indices
     return wrap_around(offset_indices, total_frames)
@@ -82,7 +86,8 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
     indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
     indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
-    logger.debug(f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
+    logger.debug(
+        f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
     frames = []
 
     for idx, frame in enumerate(container.decode(video=0)):
@@ -228,3 +233,12 @@ class Diving48Dataset(Dataset):
             frames = self.transform_fn(frames)
 
         return frames
+
+    def get_inverted_class_weights(self):
+        labels = np.array(list(map(lambda x: x['label'], self.data)))
+        _, counts = np.unique(labels, return_counts=True)
+        # hacky way to add the class with missing weights
+        counts = np.insert(counts, 30, 0)
+        weights = counts / np.sum(counts)
+        inverted_weights = 1 / weights
+        return inverted_weights / inverted_weights.sum()

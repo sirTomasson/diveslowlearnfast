@@ -99,6 +99,7 @@ class ModelConfig:
     ARCH: str = 'slowfast'
     MODEL_NAME: str = 'SlowFast'
     LOSS_FUNC: str = 'cross_entropy'
+    CLASS_WEIGHTS: bool = False
     DROPOUT_RATE: float = 0.5
     HEAD_ACT: str = 'softmax'
     DETACH_FINAL_FC: bool = False
