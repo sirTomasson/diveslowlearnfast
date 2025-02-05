@@ -202,6 +202,11 @@ def main():
                 epoch,
                 scaler,
             )
+            if len(stats['test_accuracies']) == 0:
+                save_checkpoint(model, optimiser, epoch, cfg, 'best.pth')
+            elif test_acc > stats['test_accuracies'][-1]: # the current model is better than the previous model
+                save_checkpoint(model, optimiser, epoch, cfg, 'best.pth')
+
             model.train()
             stats['test_accuracies'].append(float(test_acc))
 
