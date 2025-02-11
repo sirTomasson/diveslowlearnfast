@@ -171,11 +171,8 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg: Config, model, device: torch.device):
-    if cfg.EGL.ENABLED:
-        criterion = RRRLoss()
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
+def get_train_objects(cfg, model, device, video_ids=None):
+
 
     optimiser = torch.optim.SGD(
         model.parameters(),
@@ -186,15 +183,18 @@ def get_train_objects(cfg: Config, model, device: torch.device):
 
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
+    if cfg.EGL.ENABLED:
+        criterion = RRRLoss()
+    else:
+        if cfg.MODEL.CLASS_WEIGHTS:
+            weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)
+            criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
+        else:
+            criterion = torch.nn.CrossEntropyLoss()
+
     scaler = None
     if cfg.TRAIN.AMP:
         scaler = GradScaler()
-
-    if cfg.MODEL.CLASS_WEIGHTS:
-        weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)
-        criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
 
     return criterion, optimiser, train_loader, train_dataset, scaler
 
