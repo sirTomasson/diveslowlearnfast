@@ -172,8 +172,6 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
 
 
 def get_train_objects(cfg, model, device, video_ids=None):
-
-
     optimiser = torch.optim.SGD(
         model.parameters(),
         lr=cfg.SOLVER.BASE_LR,
