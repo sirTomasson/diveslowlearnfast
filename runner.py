@@ -15,6 +15,8 @@ from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, loa
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import StatsDB
 
+from diveslowlearnfast.egl import run_egl_train_epoch, egl_helper
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,38 +148,37 @@ def main():
         # this will ensure a new sample from the dataset with the threshold is drawn so the model will see a higher
         # variety of data.
         if cfg.DATA.THRESHOLD != -1 and cfg.DATA.SEED == -1:
-            logger.info(f'Threshold = {cfg.DATA.THRESHOLD} and cfg.DATA.SEED == -1, reloading dataset and loader at epoch {epoch}')
+            logger.info(
+                f'Threshold = {cfg.DATA.THRESHOLD} and cfg.DATA.SEED == -1, reloading dataset and loader at epoch {epoch}')
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
-        if multigrid_schedule:
-            cfg, changed = multigrid_schedule.update_long_cycle(cfg, epoch)
-            model = SlowFast(cfg).to(device)
-            criterion, optimiser, train_loader, train_dataset, scaler = train_helper.get_train_objects(cfg, model)
-            multigrid_schedule.set_dataset(train_dataset, cfg)
-            checkpoint_path = last_checkpoint(cfg)
-            if checkpoint_path:
-                model, optimiser, _ = load_checkpoint(
-                    model,
-                    optimiser,
-                    checkpoint_path,
-                    device
-                )
-            logger.info(
-                f'multigrid long cycle shape=({cfg.TRAIN.BATCH_SIZE}x{cfg.DATA.NUM_FRAMES}x{cfg.DATA.TRAIN_CROP_SIZE})')
+        if cfg.EGL.ENABLED:
+            train_acc, train_loss = run_egl_train_epoch(
+                model,
+                criterion,
+                optimiser,
+                train_loader,
+                device,
+                cfg,
+                stats_db,
+                epoch,
+                scaler
+            )
+        else:
+            train_acc, train_loss = run_train_epoch(
+                model,
+                criterion,
+                optimiser,
+                train_loader,
+                device,
+                cfg,
+                stats_db,
+                epoch,
+                multigrid_schedule,
+                scaler
+            )
 
-        train_acc, train_loss = run_train_epoch(
-            model,
-            criterion,
-            optimiser,
-            train_loader,
-            device,
-            cfg,
-            stats_db,
-            epoch,
-            multigrid_schedule,
-            scaler
-        )
-        epoch_bar.set_postfix({ 'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}' })
+        epoch_bar.set_postfix({'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}'})
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
             save_checkpoint(model, optimiser, epoch, cfg)
@@ -200,6 +201,14 @@ def main():
             stats['test_accuracies'].append(float(test_acc))
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
+
+        if epoch % cfg.EGL.MASKS_PERIOD == 0:
+            logger.info('Generating masks for difficult samples')
+            video_ids = egl_helper.get_difficult_video_ids(stats_db, epoch, cfg)
+            logger.debug(f'video_ids = {video_ids}')
+            logger.debug(f'purging masks cache')
+            egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
+            egl_helper.augment_samples(model, video_ids, cfg, device)
 
         print('\n')
         print(10 * '_')

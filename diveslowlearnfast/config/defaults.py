@@ -24,12 +24,14 @@ class DataConfig:
     THRESHOLD: int = -1
     SEED: int = -1
 
+
 @dataclass
 class RandAugmentConfig:
     ENABLED: bool = False
     PROB: float = 0.5
     NUM_LAYERS: int = 2
     MAGNITUDE: int = 9
+
 
 @dataclass
 class RandomRotateConfig:
@@ -170,6 +172,21 @@ class DataLoaderConfig:
 
 
 @dataclass
+class EGLConfig:
+    ENABLED: bool = False
+    METHOD: str = 'gradcam'
+    LOSS_FUNC: str = 'rrr'
+    MASKS_PERIOD: int = 10
+    MASKS_CACHE_DIR: Path = Path('results/.masks')
+
+
+@dataclass
+class GradCAMConfig:
+    TARGET_LAYERS: list[str] = field(default_factory=lambda: ['s5/pathway0_res2', 's5/pathway0_res2'])
+    COLORMAP: str = 'viridis'
+
+
+@dataclass
 class Config:
     NUM_GPUS: int = 1
     DATA: DataConfig = field(default_factory=DataConfig)
@@ -186,3 +203,5 @@ class Config:
     RAND_AUGMENT: RandAugmentConfig = field(default_factory=RandAugmentConfig)
     RANDOM_ROTATE: RandomRotateConfig = field(default_factory=RandomRotateConfig)
     EVAL: EvalConfig = field(default_factory=EvalConfig)
+    EGL: EGLConfig = field(default_factory=EGLConfig)
+    GRADCAM: GradCAMConfig = field(default_factory=GradCAMConfig)

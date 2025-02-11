@@ -198,4 +198,4 @@ class GradCAM:
             curr_inp = curr_inp.permute(0, 1, 4, 2, 3)
             result_ls.append(curr_inp)
 
-        return result_ls, preds
+        return result_ls, localization_maps, preds

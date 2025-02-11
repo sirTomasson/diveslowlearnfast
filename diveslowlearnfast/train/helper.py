@@ -8,6 +8,7 @@ from torchvision.transforms.v2 import Compose
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
+from diveslowlearnfast.egl.rrr import RRRLoss
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 
@@ -110,21 +111,38 @@ def get_include_labels(cfg):
     ).labels
 
 
-def get_train_loader_and_dataset(cfg):
+def get_train_loader_and_dataset(cfg, video_ids=None):
     train_transform = get_train_transform(cfg)
 
-    train_dataset = Diving48Dataset(
-        cfg.DATA.DATASET_PATH,
-        cfg.DATA.NUM_FRAMES,
-        dataset_type='train',
-        transform_fn=train_transform,
-        use_decord=cfg.DATA_LOADER.USE_DECORD,
-        temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
-        temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
-        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
-        threshold=cfg.DATA.THRESHOLD,
-        use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
-    )
+    if cfg.EGL.ENABLED:
+        train_dataset = Diving48Dataset(
+            cfg.DATA.DATASET_PATH,
+            cfg.DATA.NUM_FRAMES,
+            dataset_type='train',
+            transform_fn=train_transform,
+            use_decord=cfg.DATA_LOADER.USE_DECORD,
+            temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
+            temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
+            multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+            threshold=cfg.DATA.THRESHOLD,
+            use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
+            masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR,
+            video_ids=video_ids,
+        )
+    else:
+        train_dataset = Diving48Dataset(
+            cfg.DATA.DATASET_PATH,
+            cfg.DATA.NUM_FRAMES,
+            dataset_type='train',
+            transform_fn=train_transform,
+            use_decord=cfg.DATA_LOADER.USE_DECORD,
+            temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
+            temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
+            multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+            threshold=cfg.DATA.THRESHOLD,
+            use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
+            video_ids=video_ids,
+        )
 
     train_loader = DataLoader(
         train_dataset,
@@ -136,8 +154,12 @@ def get_train_loader_and_dataset(cfg):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg, model):
-    criterion = torch.nn.CrossEntropyLoss()
+def get_train_objects(cfg, model, video_ids=None):
+    if cfg.EGL.ENABLED:
+        criterion = RRRLoss()
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
+
     optimiser = torch.optim.SGD(
         model.parameters(),
         lr=cfg.SOLVER.BASE_LR,
@@ -145,7 +167,7 @@ def get_train_objects(cfg, model):
         weight_decay=cfg.SOLVER.WEIGHT_DECAY,
     )
 
-    train_loader, train_dataset = get_train_loader_and_dataset(cfg)
+    train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
     scaler = None
     if cfg.TRAIN.AMP:

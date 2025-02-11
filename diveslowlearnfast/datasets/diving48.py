@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
 
-def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
+
+def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
+                      use_sampling_ratio=False, **kwargs):
     import decord
     from decord import cpu
 
@@ -31,6 +33,7 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
 def pad_video(video, size):
     padding_size = size - len(video)
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
+
 
 def wrap_around(offset_indices, total_frames):
     result = []
@@ -53,7 +56,8 @@ def temporal_random_offset_indices(indices, total_frames, temporal_random_offset
         # total_frames/num_frames is the minimum by which we need to shift the indices in order to cover all frames
         # across different epochs. Calculating this dynamically may result in more stable behaviour.
         temporal_random_offset = math.floor(total_frames / len(indices))
-        logger.debug(f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
+        logger.debug(
+            f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
 
     offset_indices = math.floor(random.uniform(0, temporal_random_offset)) + indices
     return wrap_around(offset_indices, total_frames)
@@ -82,7 +86,8 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
     indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
     indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
-    logger.debug(f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
+    logger.debug(
+        f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
     frames = []
 
     for idx, frame in enumerate(container.decode(video=0)):
@@ -115,7 +120,9 @@ class Diving48Dataset(Dataset):
                  threshold=-1,
                  seed=42,
                  include_labels=None,
-                 use_sampling_ratio=False):
+                 use_sampling_ratio=False,
+                 video_ids=None,
+                 masks_cache_dir=None):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -132,6 +139,8 @@ class Diving48Dataset(Dataset):
         self.seed = seed
         self.include_labels = include_labels
         self.use_sampling_ratio = use_sampling_ratio
+        self.include_video_ids = video_ids
+        self.masks_cache_dir = masks_cache_dir
         self._init_dataset()
 
     def _init_dataset(self):
@@ -146,6 +155,9 @@ class Diving48Dataset(Dataset):
 
         if self.include_labels is not None:
             self._include_labels()
+
+        if self.include_video_ids is not None:
+            self.data = list(filter(lambda video: video['vid_name'] in self.include_video_ids, self.data))
 
     def _filter_data(self):
         # convert data to { label: [ {...}, {...}.. ] }
@@ -196,10 +208,22 @@ class Diving48Dataset(Dataset):
 
         return frames, io_time, transform_time
 
+    def _read_mask(self, video_id, h, w):
+        mask_filename = os.path.join(self.masks_cache_dir, f'{video_id}.npy')
+        if os.path.exists(mask_filename):
+            return np.load(mask_filename)
+
+        return np.zeros((1, self.num_frames, h, w), dtype=np.bool_)
+
     def __getitem__(self, index):
         video_id = self.data[index]['vid_name']
         label = self.data[index]['label']
         frames, io_time, transform_time = self._read_frames(video_id)
+        if self.masks_cache_dir:
+            _, _, h, w = frames.shape
+            mask = self._read_mask(video_id, h, w)
+            return frames, label, io_time, transform_time, video_id, mask
+
         return frames, label, io_time, transform_time, video_id
 
     def __len__(self):

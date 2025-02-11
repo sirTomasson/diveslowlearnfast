@@ -1,5 +1,7 @@
+import time
 import os
 import unittest
+from contextlib import contextmanager
 
 import numpy as np
 import sqlite3
@@ -33,8 +35,52 @@ class StatsDB:
         self.con.commit()
 
 
-    def execute_query(self, query, **kwargs):
-        return [list(row) for row in self.con.execute(query, kwargs)]
+    def execute_query(self, query, data=None):
+        if data is None:
+            return [list(row) for row in self.con.execute(query)]
+
+        return [list(row) for row in self.con.execute(query, data)]
+
+
+    def get_difficult_samples(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch'):
+        data = [epoch_start]
+        if epoch_end == 'max_epoch':
+            epoch_end = ''
+        else:
+            data.append(epoch_end)
+            epoch_end = 'AND epoch <= ?'
+
+        data.extend([run_id, split])
+        query = f"""
+        WITH
+            acc AS (
+                SELECT video_id, gt, (correct_n / n) as acc FROM(
+                    SELECT
+                        video_id,
+                        gt,
+                        epoch,
+                        CAST(SUM(CASE WHEN pred = gt THEN 1 ELSE 0 END) as REAL) as correct_n,
+                        CAST(COUNT(*) as REAL) as n
+                    FROM stats
+                    WHERE epoch > ? {epoch_end}
+                    AND run_id = ?
+                    AND split = ?
+                    GROUP BY video_id, gt
+                )
+            ),
+            median AS (
+                SELECT AVG(acc) as median FROM(
+                    SELECT * FROM acc
+                    ORDER BY acc
+                    LIMIT 2 - (SELECT COUNT(*) FROM acc) % 2
+                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM acc)
+                )
+            )
+        SELECT *, (SELECT median FROM median) as median FROM acc
+        WHERE acc <= median
+        ORDER BY acc
+        """
+        return self.execute_query(query, tuple(data))
 
 
 
@@ -120,13 +166,25 @@ class Statistics:
 
             return value
         elif key.startswith('mean_'):
-            value = np.mean(self.stats[key.replace('mean_', '')])
+            stat = self.stats[key.replace('mean_', '')]
+            if len(stat) == 0:
+                return None
+
+            value = np.mean(stat)
             if formatted:
                 value = f'{value:.3f}'
 
             return value
         else:
             return self.stats[key]
+
+
+    @contextmanager
+    def timer(self, key):
+        start = time.time()
+        yield
+        elapsed = time.time() - start
+        self.update(**{ key: elapsed })
 
 
 class StatisticsTest(unittest.TestCase):
@@ -151,3 +209,13 @@ class StatisticsTest(unittest.TestCase):
         self.assertEqual(stats.loss(), [3.0, 3.0, 6.0])
         self.assertAlmostEqual(stats.mean_accuracy(), 0.33, places=2)
         self.assertEqual(stats.mean_loss(), 4.0)
+
+
+    def test_timer(self):
+        stats = Statistics()
+        with stats.timer('batch_time'):
+            _ = [i*i for i in range(1000)]
+
+        self.assertGreater(stats.mean_batch_time(), 0.0)
+        self.assertIsNone(stats.mean_loss())
+
