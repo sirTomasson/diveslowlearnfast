@@ -1,6 +1,6 @@
 import pytorchvideo
 import torch
-from pytorchvideo.transforms import Div255, RandAugment
+from pytorchvideo.transforms import Div255
 from torch import autocast
 from torch.cpu.amp import GradScaler
 from torch.utils.data import DataLoader
@@ -8,7 +8,7 @@ from torchvision.transforms.v2 import Compose
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
-from diveslowlearnfast.egl.rrr import RRRLoss
+from diveslowlearnfast.loss.rrr import RRRLoss
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 

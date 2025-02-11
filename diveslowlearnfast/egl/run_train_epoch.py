@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
-from diveslowlearnfast.egl.rrr import RRRLoss
+from diveslowlearnfast.loss.rrr import RRRLoss
 from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import Statistics
