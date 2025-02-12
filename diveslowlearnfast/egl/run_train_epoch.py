@@ -20,23 +20,6 @@ def get_n_batches_per_step(cfg: Config):
     return n_batches if n_batches > 0 else 1
 
 
-def get_batch(loader: Iterator,
-              device: torch.device,
-              stats: Statistics,
-              data_requires_grad: bool=False):
-
-    with stats.timer('loader_time'):
-        xb, yb, io_times, transform_times, video_ids, masks = next(loader)
-
-    stats.update(
-        io_time=io_times.numpy().mean(),
-        transform_time=transform_times.numpy().mean()
-    )
-    xb = xb.to(device)
-    xb.requires_grad = data_requires_grad
-    return xb, yb.to(device), video_ids, masks
-
-
 def should_step(batch_idx: int, n_batches: int, loader: DataLoader):
     return (batch_idx+1) % n_batches == 0 or (batch_idx+1) == len(loader)
 
@@ -73,10 +56,10 @@ def run_train_epoch(model: nn.Module,
     running_loss = 0.0
     for i in batch_bar:
         with stats.timer('batch_time'):
-            xb, yb, video_ids, masks = get_batch(loader_iter, device, stats, data_requires_grad=True)
+            xb, yb, video_ids, masks = train_helper.get_batch(loader_iter, device, stats, data_requires_grad=True)
 
             logits = train_helper.forward(model, xb, device, cfg, scaler)
-            loss, _ = rrr_loss(logits, yb, model, xb, masks)
+            loss, _ = rrr_loss(logits, yb, xb, masks)
             loss /= n_batches_per_step # scale loss by the number of batches in a step
             train_helper.backward(loss)
 
@@ -103,4 +86,8 @@ def run_train_epoch(model: nn.Module,
             'current_loss',
             'current_accuracy',
         ))
+
+    mean_accuracy = stats.mean_accuracy()
+    mean_loss = stats.mean_loss()
+    return mean_accuracy, mean_loss
 

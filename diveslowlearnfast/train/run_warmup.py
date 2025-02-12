@@ -4,6 +4,7 @@ import numpy as np
 
 from tqdm import tqdm
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.train import helper as train_helper
 
 from torch.optim.lr_scheduler import _LRScheduler
 
@@ -26,19 +27,18 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
     dataloader_iter = islice(cycle(dataloader), warmup_epochs)
     warmup_bar.set_description("Warming up")
     for i in warmup_bar:
-        xb, yb, *_ = next(dataloader_iter)
+        xb, yb, _, masks = train_helper.get_batch(dataloader_iter, device, data_requires_grad=cfg.EGL.ENABLED)
+
         lr = lr_schedule[i]
         optimiser.param_groups[0]['lr'] = lr
         warmup_bar.set_postfix({ 'lr': lr })
-
-        yb = yb.to(device)
-        xb_fast = xb[:].to(device)
-        # reduce the number of frames by the alpha ratio
-        # B x C x T / alpha x H x W
-        xb_slow = xb[:, :, ::cfg.SLOWFAST.ALPHA].to(device)
-
         optimiser.zero_grad()
-        o = model([xb_slow, xb_fast])
-        loss = criterion(o, yb)
+
+        logits = train_helper.forward(model, xb, device, cfg)
+        if cfg.EGL.ENABLED:
+            loss, _ = criterion(logits, yb, xb, masks)
+        else:
+            loss = criterion(logits, yb)
+
         loss.backward()
         optimiser.step()

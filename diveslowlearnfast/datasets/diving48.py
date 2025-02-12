@@ -224,7 +224,7 @@ class Diving48Dataset(Dataset):
             mask = self._read_mask(video_id, h, w)
             return frames, label, io_time, transform_time, video_id, mask
 
-        return frames, label, io_time, transform_time, video_id
+        return frames, label, io_time, transform_time, video_id, False
 
     def __len__(self):
         return self.num_videos

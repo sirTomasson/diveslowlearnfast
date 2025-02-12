@@ -25,7 +25,7 @@ def generate_masks(loader, explainer, cfg: Config):
     loader = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Generating masks')
     for _ in batch_bar:
-        xb, yb, _, _, video_ids = next(loader)
+        xb, yb, _, _, video_ids, _ = next(loader)
         exp = explainer(xb, yb)
         masks = _generate_masks(exp)
         _save_masks(masks, video_ids, masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR)

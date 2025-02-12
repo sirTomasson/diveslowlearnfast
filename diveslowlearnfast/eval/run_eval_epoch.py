@@ -32,7 +32,7 @@ def run_eval_epoch(model: nn.Module,
     V_ids = []
     losses = []
     for _ in eval_bar:
-        xb, yb, io_times, transform_times, video_ids = next(loader_iter)
+        xb, yb, io_times, transform_times, video_ids, _ = next(loader_iter)
         o = train_helper.forward(model, xb, device, cfg, scaler)
         ypred = o.argmax(dim=-1)
         Y_true.extend(yb.numpy())

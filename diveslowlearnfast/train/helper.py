@@ -1,3 +1,5 @@
+from typing import Iterator
+
 import pytorchvideo
 import torch
 from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize
@@ -9,7 +11,29 @@ from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.loss.rrr import RRRLoss
+from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
+
+
+def get_batch(loader: Iterator,
+              device: torch.device,
+              stats: Statistics=None,
+              data_requires_grad: bool=False):
+
+    if stats:
+        with stats.timer('loader_time'):
+            xb, yb, io_times, transform_times, video_ids, masks = next(loader)
+    else:
+        xb, yb, io_times, transform_times, video_ids, masks = next(loader)
+
+    if stats:
+        stats.update(
+            io_time=io_times.numpy().mean(),
+            transform_time=transform_times.numpy().mean()
+        )
+    xb = xb.to(device)
+    xb.requires_grad = data_requires_grad
+    return xb, yb.to(device), video_ids, masks.to(device)
 
 
 def get_aug_paras(cfg: Config):
@@ -171,7 +195,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg: Config, model, device: torch.device, video_ids):
+def get_train_objects(cfg, model, device, video_ids=None):
     optimiser = torch.optim.SGD(
         model.parameters(),
         lr=cfg.SOLVER.BASE_LR,

@@ -34,7 +34,7 @@ def run_train_epoch(model: nn.Module,
     count = 0
     for i in batch_bar:
         start_time = time.time()
-        xb, yb, io_times, transform_times, video_ids = next(loader_iter)
+        xb, yb, io_times, transform_times, video_ids, _ = next(loader_iter)
         stats.update(loader_time=(time.time() - start_time))
         start_time = time.time()
 
