@@ -17,9 +17,8 @@ from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
 def get_batch(loader: Iterator,
               device: torch.device,
-              stats: Statistics=None,
-              data_requires_grad: bool=False):
-
+              stats: Statistics = None,
+              data_requires_grad: bool = False):
     if stats:
         with stats.timer('loader_time'):
             xb, yb, io_times, transform_times, video_ids, masks = next(loader)
@@ -195,7 +194,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, train_dataset
 
 
-def get_train_objects(cfg, model, device, video_ids=None):
+def get_train_objects(cfg: Config, model, device: torch.device, video_ids=None):
     optimiser = torch.optim.SGD(
         model.parameters(),
         lr=cfg.SOLVER.BASE_LR,

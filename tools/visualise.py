@@ -67,7 +67,7 @@ def display_all(stats_path, **kwargs):
 
 
 def plot_confusion_matrix(confusion_matrix, save_path=None, labels=None, **_kwargs):
-    if not labels:
+    if labels is None:
         labels = np.arange(len(confusion_matrix))
 
     # Visualizing the confusion matrix using matplotlib
@@ -98,7 +98,7 @@ def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
     diagonals = np.array(confusion_matrix.diagonal())
     per_class_accuracy = (diagonals / totals) * 100
 
-    if not labels:
+    if labels is None:
         labels = range(len(per_class_accuracy))
 
     # Create continuous indices and map them to actual labels
