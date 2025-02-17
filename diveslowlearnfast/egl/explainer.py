@@ -23,6 +23,8 @@ class GradCamExplainer(nn.Module):
         # reduce the number of frames by the alpha ratio
         # B x C x T / alpha x H x W
         xb_slow = x[:, :, ::self.cfg.SLOWFAST.ALPHA].to(self.device)
+        if y is not None:
+            y = y.to(self.device)
         _, localisation_maps, _ = self.gradcam([xb_slow, xb_fast], y)
         return localisation_maps[1] # only return the xb_fast explanation.
 

@@ -7,7 +7,7 @@ from diveslowlearnfast.config import Config
 
 
 def _generate_masks(exp, percentile=50):
-    features = exp.numpy()
+    features = exp.detach().cpu().numpy()
     thresh = np.percentile(features, percentile, axis=(1, 2, 3, 4))
     thresh = thresh.reshape((-1, 1, 1, 1, 1))
     return ~(features > thresh)

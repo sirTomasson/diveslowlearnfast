@@ -212,7 +212,7 @@ def main():
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
 
-        if epoch % cfg.EGL.MASKS_PERIOD == 0:
+        if cfg.EGL.ENABLED and epoch % cfg.EGL.MASKS_PERIOD == 0:
             logger.info('Generating masks for difficult samples')
             video_ids = egl_helper.get_difficult_video_ids(stats_db, epoch, cfg)
             logger.debug(f'video_ids = {video_ids}')

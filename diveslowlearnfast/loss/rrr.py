@@ -3,6 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
+
+logger = logging.getLogger(__name__)
 
 class RRRLoss(nn.Module):
     def __init__(self, lambda1=1000.0):
