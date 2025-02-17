@@ -1,4 +1,6 @@
-import time
+import logging
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -48,14 +50,16 @@ class RRRLoss(nn.Module):
         # be ignored anyway
         mask = (masks.sum(dim=(1, 2, 3, 4)) > 0)
         masked_elements = inputs[mask]
-
+        logger.debug(f'Masked elements shape = {tuple(masked_elements.shape)}')
         if masked_elements.shape[0] > 0:
+            logger.debug(f'running RRR Loss')
             log_probs = F.softmax(masked_elements, dim=1)
             summed_log_probs = log_probs.sum()
             gradients = torch.autograd.grad(summed_log_probs, inputs, create_graph=True, retain_graph=True)[0]
             gradient_loss = (masks * gradients).pow(2).mean()
             gradient_loss_item = gradient_loss.item()
         else:
+            logger.debug(f'running CE Loss')
             gradient_loss = 0
             gradient_loss_item = gradient_loss
 
