@@ -53,10 +53,10 @@ class RRRLoss(nn.Module):
         logger.debug(f'Masked elements shape = {tuple(masked_elements.shape)}')
         if masked_elements.shape[0] > 0:
             logger.debug(f'running RRR Loss')
-            log_probs = F.softmax(masked_elements, dim=1)
+            log_probs = F.softmax(logits, dim=1)
             summed_log_probs = log_probs.sum()
             gradients = torch.autograd.grad(summed_log_probs, inputs, create_graph=True, retain_graph=True)[0]
-            gradient_loss = (masks * gradients).pow(2).mean()
+            gradient_loss = (masked_elements * gradients).pow(2).mean()
             gradient_loss_item = gradient_loss.item()
         else:
             logger.debug(f'running CE Loss')
