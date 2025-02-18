@@ -77,7 +77,7 @@ class StatsDB:
                 )
             )
         SELECT *, (SELECT median FROM median) as median FROM acc
-        WHERE acc <= median
+        WHERE acc < median
         ORDER BY acc
         """
         return self.execute_query(query, tuple(data))
