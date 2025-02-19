@@ -218,7 +218,8 @@ def main():
             logger.debug(f'video_ids = {video_ids}')
             logger.debug(f'purging masks cache')
             egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
-            egl_helper.augment_samples(model, video_ids, cfg, device)
+            if len(video_ids) > 0:
+                egl_helper.augment_samples(model, video_ids, cfg, device)
 
         print('\n')
         print(10 * '_')
