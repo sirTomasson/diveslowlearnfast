@@ -7,11 +7,14 @@ from diveslowlearnfast.config import Config
 from diveslowlearnfast.models.utils import to_slowfast_inputs
 
 
-def _generate_masks(exp, percentile=50):
+def _generate_masks(exp, percentile=50, invert=False):
     features = exp.detach().cpu().numpy()
     thresh = np.percentile(features, percentile, axis=(1, 2, 3, 4))
     thresh = thresh.reshape((-1, 1, 1, 1, 1))
-    return ~(features > thresh)
+    mask = features > thresh
+    if invert:
+        mask = ~mask
+    return mask
 
 
 def _save_masks(masks, video_ids, masks_cache_dir):
@@ -45,5 +48,5 @@ def generate_masks(loader, explainer, cfg: Config):
             requires_grad=True
         )
         localisation_maps, _logits = explainer(inputs, yb)
-        masks = [_generate_masks(localisation_map) for localisation_map in localisation_maps]
+        masks = [_generate_masks(localisation_map, invert=cfg.EGL.INVERT_MASKS, percentile=cfg.EGL.MASK_PERCENTILE) for localisation_map in localisation_maps]
         _save_masks(masks, video_ids, masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR)

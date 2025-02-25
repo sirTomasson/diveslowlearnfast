@@ -2,6 +2,8 @@ import os
 import shutil
 
 import torch
+import logging
+
 from torch.utils.data import DataLoader
 
 from diveslowlearnfast.config import Config
@@ -10,7 +12,11 @@ from diveslowlearnfast.egl.explainer import ExplainerStrategy
 from diveslowlearnfast.egl.generate_masks import generate_masks
 from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train.helper import get_train_transform
+from diveslowlearnfast.train.stats import wps_strategy
 
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
+
+logger = logging.getLogger(__name__)
 
 def get_difficult_video_ids(stats_db: StatsDB, epoch, cfg: Config):
     if len(cfg.EGL.RUN_ID) > 0:
@@ -18,11 +24,14 @@ def get_difficult_video_ids(stats_db: StatsDB, epoch, cfg: Config):
     else:
         run_id = str(cfg.TRAIN.RESULT_DIR)
 
-    difficult_samples = stats_db.get_difficult_samples(
+    strategy = wps_strategy(stats_db, cfg)
+    logger.info(f'strategy = {cfg.EGL.WORST_PERFORMER_STRATEGY}')
+    difficult_samples = strategy(
         epoch_start=(epoch - 10),
         run_id=run_id,
         split='train'
     )
+
     return list(map(lambda x: x[0], difficult_samples))
 
 

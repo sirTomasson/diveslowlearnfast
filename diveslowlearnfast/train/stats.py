@@ -6,6 +6,9 @@ from contextlib import contextmanager
 import numpy as np
 import sqlite3
 
+from diveslowlearnfast.config import Config
+
+
 class StatsDB:
     def __init__(self, path=None):
         super().__init__()
@@ -62,7 +65,39 @@ class StatsDB:
         return [list(row) for row in self.con.execute(query, data)]
 
 
-    def get_difficult_samples(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch'):
+    def get_sample_accuracy(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch'):
+        data = [epoch_start]
+        if epoch_end == 'max_epoch':
+            epoch_end = ''
+        else:
+            data.append(epoch_end)
+            epoch_end = 'AND epoch <= ?'
+
+        data.extend([run_id, split])
+        query = f"""SELECT video_id, gt, (correct_n / n) as acc FROM(
+            SELECT
+                video_id,
+                gt,
+                epoch,
+                CAST(SUM(CASE WHEN pred = gt THEN 1 ELSE 0 END) as REAL) as correct_n,
+                CAST(COUNT(*) as REAL) as n
+            FROM stats
+            WHERE epoch > ? {epoch_end}
+            AND run_id = ?
+            AND split = ?
+            GROUP BY video_id, gt
+        ) ORDER BY acc
+        """
+        return self.execute_query(query, tuple(data))
+
+
+    def get_lowest_percentile(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch', percentile=5):
+        sample_acc = self.get_sample_accuracy(epoch_start, run_id, split, epoch_end)
+        top_n = int(len(sample_acc) * (percentile / 100))
+        return sample_acc[:top_n]
+
+
+    def get_below_median_samples(self, epoch_start, run_id, split, epoch_end: int | str= 'max_epoch'):
         data = [epoch_start]
         if epoch_end == 'max_epoch':
             epoch_end = ''
@@ -114,6 +149,17 @@ class StatsDB:
         return Y_true, Y_pred, labels
 
 
+def wps_strategy(stats_db: StatsDB, cfg: Config):
+    strategy = cfg.EGL.WORST_PERFORMER_STRATEGY
+    assert strategy in ['median', 'percentile']
+    if strategy == 'median':
+        return stats_db.get_below_median_samples
+    elif strategy == 'percentile':
+        def _wsp_percentile_strategy(epoch_start, run_id, split, epoch_end: int | str = 'max_epoch'):
+            return stats_db.get_lowest_percentile(epoch_start, run_id, split, epoch_end,
+                                                  percentile=cfg.EGL.WORST_PERFORMER_PERCENTILE)
+        return _wsp_percentile_strategy
+
 
 class PerSampleStatisticsTest(unittest.TestCase):
 
@@ -152,8 +198,6 @@ class PerSampleStatisticsTest(unittest.TestCase):
     def tearDown(self):
         if os.path.exists('./stats.db'):
             os.remove('./stats.db')
-
-
 
 class Statistics:
 

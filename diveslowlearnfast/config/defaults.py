@@ -179,6 +179,10 @@ class EGLConfig:
     LOSS_FUNC: str = 'rrr'
     MASKS_PERIOD: int = 10
     MASKS_CACHE_DIR: Path = Path('results/.masks')
+    INVERT_MASKS: bool = False
+    MASK_PERCENTILE: int = 95
+    WORST_PERFORMER_STRATEGY: str = 'median'
+    WORST_PERFORMER_PERCENTILE: int = 5
     RUN_ID: str = ''
 
 
