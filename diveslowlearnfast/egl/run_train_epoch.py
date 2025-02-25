@@ -9,7 +9,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
-from diveslowlearnfast.loss.rrr import RRRLoss
+from diveslowlearnfast.loss.rrr import RRRLoss, DualPathRRRLoss
+from diveslowlearnfast.models.utils import to_slowfast_inputs
 from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import Statistics
@@ -39,7 +40,7 @@ def calc_accuracy(Y_true, Y_pred):
 
 
 def run_train_epoch(model: nn.Module,
-                    rrr_loss: RRRLoss,
+                    rrr_loss: RRRLoss | DualPathRRRLoss,
                     optimiser: torch.optim.Optimizer,
                     loader: DataLoader,
                     device,
@@ -56,10 +57,20 @@ def run_train_epoch(model: nn.Module,
     running_loss = 0.0
     for i in batch_bar:
         with stats.timer('batch_time'):
-            xb, yb, video_ids, masks = train_helper.get_batch(loader_iter, device, stats, data_requires_grad=True)
+            xb, yb, video_ids, masks_slow, masks_fast = train_helper.get_batch(
+                loader_iter,
+                device,
+                stats
+            )
 
-            logits = train_helper.forward(model, xb, device, cfg, scaler)
-            loss, _ = rrr_loss(logits, yb, xb, masks)
+            inputs = to_slowfast_inputs(
+                xb,
+                alpha=cfg.SLOWFAST.ALPHA,
+                requires_grad=True
+            )
+
+            logits = model(inputs)
+            loss, _ = rrr_loss(logits, yb, inputs, [masks_slow, masks_fast])
             loss /= n_batches_per_step # scale loss by the number of batches in a step
             train_helper.backward(loss)
 

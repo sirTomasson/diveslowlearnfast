@@ -83,6 +83,17 @@ class StatsDB:
         return self.execute_query(query, tuple(data))
 
 
+    def get_ytrue_and_pred(self, epoch, run_id, split):
+        result = self.execute_query("""SELECT gt, pred FROM stats
+        WHERE epoch = ? AND split = ? AND run_id = ?
+        """, (epoch, split, run_id))
+        result = np.array(result)
+        Y_true = result[:, 0]
+        Y_pred = result[:, 1]
+        labels = np.unique(Y_true)
+        return Y_true, Y_pred, labels
+
+
 
 class PerSampleStatisticsTest(unittest.TestCase):
 

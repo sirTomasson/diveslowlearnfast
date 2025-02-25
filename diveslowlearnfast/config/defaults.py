@@ -183,9 +183,12 @@ class EGLConfig:
 
 @dataclass
 class GradCAMConfig:
-    TARGET_LAYERS: list[str] = field(default_factory=lambda: ['s5/pathway0_res2', 's5/pathway0_res2'])
+    TARGET_LAYERS: list[str] = field(default_factory=lambda: ['s5/pathway0_res2', 's5/pathway1_res2'])
     COLORMAP: str = 'viridis'
 
+@dataclass
+class RRRConfig:
+    LAMBDAS: list[float] = field(default_factory=lambda: [0.5e11, 0.5e10])
 
 @dataclass
 class Config:
@@ -206,3 +209,4 @@ class Config:
     EVAL: EvalConfig = field(default_factory=EvalConfig)
     EGL: EGLConfig = field(default_factory=EGLConfig)
     GRADCAM: GradCAMConfig = field(default_factory=GradCAMConfig)
+    RRR: RRRConfig = field(default_factory=RRRConfig)

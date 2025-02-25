@@ -146,6 +146,19 @@ def main():
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
 
+    if cfg.EGL.ENABLED:
+        logger.info('Generating masks for difficult samples')
+        video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
+        logger.debug(f'video_ids = {video_ids}')
+        logger.debug(f'purging masks cache')
+        egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
+
+        if len(video_ids) > 0:
+            egl_helper.augment_samples(model, video_ids, cfg, device)
+        else:
+            logger.error('No video_ids to generate masks for, exiting!')
+            return
+
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
@@ -211,15 +224,6 @@ def main():
             stats['test_accuracies'].append(float(test_acc))
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
-
-        if cfg.EGL.ENABLED and epoch % cfg.EGL.MASKS_PERIOD == 0:
-            logger.info('Generating masks for difficult samples')
-            video_ids = egl_helper.get_difficult_video_ids(stats_db, epoch, cfg)
-            logger.debug(f'video_ids = {video_ids}')
-            logger.debug(f'purging masks cache')
-            egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
-            if len(video_ids) > 0:
-                egl_helper.augment_samples(model, video_ids, cfg, device)
 
         print('\n')
         print(10 * '_')

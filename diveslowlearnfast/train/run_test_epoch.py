@@ -28,7 +28,7 @@ def run_test_epoch(model: nn.Module,
     accuracies = []
     for _ in batch_bar:
         start_time = time.time()
-        xb, yb, io_times, transform_times, video_ids, mask = next(loader_iter)
+        xb, yb, io_times, transform_times, video_ids, *_ = next(loader_iter)
         loader_times.append(time.time() - start_time)
 
         start_time = time.time()

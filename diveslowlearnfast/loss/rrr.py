@@ -48,27 +48,69 @@ class RRRLoss(nn.Module):
         # boolean mask to select indices for which there is a mask available
         # this little optimisation ensures that we do not use autograd on inputs that will
         # be ignored anyway
-        mask = (masks.sum(dim=(1, 2, 3, 4)) > 0)
-        masked_elements = inputs[mask]
-        logger.debug(f'Masked elements shape = {tuple(masked_elements.shape)}')
-        if masked_elements.shape[0] > 0:
-            logger.debug(f'running RRR Loss')
-            log_probs = F.softmax(logits, dim=1)
-            summed_log_probs = log_probs.sum()
-            gradients = torch.autograd.grad(summed_log_probs, inputs, create_graph=True, retain_graph=True)[0]
-            gradient_loss = (masked_elements * gradients).pow(2).mean()
-            gradient_loss_item = gradient_loss.item()
-        else:
-            logger.debug(f'running CE Loss')
-            gradient_loss = 0
-            gradient_loss_item = gradient_loss
+        summed_log_probs = F.softmax(logits, dim=1).sum()
+        gradients = torch.autograd.grad(summed_log_probs, inputs, create_graph=True, retain_graph=True)[0]
+        gradient_loss = (masks * gradients).pow(2).mean()
 
         total_loss = ce_loss + self.lambda1 * gradient_loss
 
         losses = {
             'total_loss': total_loss.item(),
             'ce_loss': ce_loss.item(),
-            'gradient_loss': gradient_loss_item
+            'gradient_loss': gradient_loss.item()
         }
 
         return total_loss, losses
+
+
+def _normalise_gradients(gradients):
+    return gradients / (gradients.abs().mean() + 1e-7)
+
+
+class DualPathRRRLoss(nn.Module):
+
+
+    def __init__(self, lambdas=None, normalise_gradients=False, force_new_gradients=False):
+        super().__init__()
+        if lambdas is None:
+            lambdas = [0.5e12, 0.5e12]
+
+        self.lambdas = lambdas
+        self.normalise_gradients = normalise_gradients
+        self.force_new_gradients = force_new_gradients
+        self.cross_entropy = nn.CrossEntropyLoss()
+
+    def forward(self, logits, targets, inputs, masks):
+        ce_loss = self.cross_entropy(logits, targets)
+        total_loss = ce_loss
+        losses = {
+            'ce_loss': ce_loss.item(),
+        }
+
+        summed_log_probs = F.log_softmax(logits, dim=1).sum()
+
+        for idx, (inp, mask) in enumerate(zip(inputs, masks)):
+            gradients = self._calculate_gradient(inp, summed_log_probs)
+
+            if self.normalise_gradients:
+                gradients = _normalise_gradients(gradients)
+            gradient_loss = self.lambdas[idx] * (mask * gradients).pow(2).mean()  # Added lambda1 scaling
+            total_loss += gradient_loss
+            losses[f'gradient_loss_path_{idx}'] = gradient_loss.item()
+
+        losses['total_loss'] = total_loss.item()
+        return total_loss, losses
+
+
+    def _calculate_gradient(self, inp, summed_log_probs):
+        if inp.grad is None or self.force_new_gradients:
+            logger.debug('No gradients on "inp", recalculating gradients using summed_log_probs')
+            return torch.autograd.grad(
+                summed_log_probs,
+                inp,
+                create_graph=True,
+                retain_graph=True
+            )[0]
+
+        logger.debug('Gradients exist on "inp", reusing existing gradients')
+        return inp.grad

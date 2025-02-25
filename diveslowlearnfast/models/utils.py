@@ -47,3 +47,14 @@ def last_checkpoint(cfg: Config):
 
 def get_parameter_count(model):
     return sum(p.numel() for p in model.parameters())
+
+
+def to_slowfast_inputs(xb, alpha, requires_grad=False, device: torch.device=torch.device('cpu')):
+    xb_fast = xb[:].to(device)
+    # reduce the number of frames by the alpha ratio
+    # B x C x T / alpha x H x W
+    xb_slow = xb[:, :, ::alpha].to(device)
+    xb_fast.requires_grad = requires_grad
+    xb_slow.requires_grad = requires_grad
+
+    return [xb_slow, xb_fast]

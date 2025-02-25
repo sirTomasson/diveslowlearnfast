@@ -27,7 +27,7 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
     dataloader_iter = islice(cycle(dataloader), warmup_epochs)
     warmup_bar.set_description("Warming up")
     for i in warmup_bar:
-        xb, yb, _, masks = train_helper.get_batch(dataloader_iter, device, data_requires_grad=cfg.EGL.ENABLED)
+        xb, yb, _, masks_slow, masks_fast = train_helper.get_batch(dataloader_iter, device, data_requires_grad=cfg.EGL.ENABLED)
 
         lr = lr_schedule[i]
         optimiser.param_groups[0]['lr'] = lr
@@ -36,7 +36,7 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
 
         logits = train_helper.forward(model, xb, device, cfg)
         if cfg.EGL.ENABLED:
-            loss, _ = criterion(logits, yb, xb, masks)
+            loss, _ = criterion(logits, yb, xb, [masks_slow, masks_fast])
         else:
             loss = criterion(logits, yb)
 

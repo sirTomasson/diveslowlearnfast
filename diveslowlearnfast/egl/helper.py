@@ -38,6 +38,7 @@ def get_difficult_samples_loader_and_dataset(cfg, video_ids):
     train_dataset = Diving48Dataset(
         cfg.DATA.DATASET_PATH,
         cfg.DATA.NUM_FRAMES,
+        alpha=cfg.SLOWFAST.ALPHA,
         dataset_type='train',
         transform_fn=train_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD,

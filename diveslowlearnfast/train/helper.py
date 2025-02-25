@@ -10,7 +10,7 @@ from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
-from diveslowlearnfast.loss.rrr import RRRLoss
+from diveslowlearnfast.loss.rrr import DualPathRRRLoss
 from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
@@ -21,9 +21,9 @@ def get_batch(loader: Iterator,
               data_requires_grad: bool = False):
     if stats:
         with stats.timer('loader_time'):
-            xb, yb, io_times, transform_times, video_ids, masks = next(loader)
+            xb, yb, io_times, transform_times, video_ids, masks_slow, masks_fast = next(loader)
     else:
-        xb, yb, io_times, transform_times, video_ids, masks = next(loader)
+        xb, yb, io_times, transform_times, video_ids, masks_slow, masks_fast = next(loader)
 
     if stats:
         stats.update(
@@ -32,7 +32,7 @@ def get_batch(loader: Iterator,
         )
     xb = xb.to(device)
     xb.requires_grad = data_requires_grad
-    return xb, yb.to(device), video_ids, masks.to(device)
+    return xb, yb.to(device), video_ids, masks_slow, masks_fast
 
 
 def get_aug_paras(cfg: Config):
@@ -121,6 +121,7 @@ def get_test_objects(cfg, include_labels=None):
     test_dataset = Diving48Dataset(
         cfg.DATA.DATASET_PATH,
         cfg.DATA.NUM_FRAMES,
+        cfg.SLOWFAST.ALPHA,
         dataset_type='test',
         transform_fn=test_transform,
         use_decord=cfg.DATA_LOADER.USE_DECORD,
@@ -146,6 +147,7 @@ def get_include_labels(cfg):
     return Diving48Dataset(
         cfg.DATA.DATASET_PATH,
         cfg.DATA.NUM_FRAMES,
+        alpha=cfg.SLOWFAST.ALPHA,
         dataset_type='train',
         threshold=cfg.DATA.THRESHOLD,
     ).labels
@@ -158,6 +160,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
         train_dataset = Diving48Dataset(
             cfg.DATA.DATASET_PATH,
             cfg.DATA.NUM_FRAMES,
+            alpha=cfg.SLOWFAST.ALPHA,
             dataset_type='train',
             transform_fn=train_transform,
             use_decord=cfg.DATA_LOADER.USE_DECORD,
@@ -173,6 +176,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
         train_dataset = Diving48Dataset(
             cfg.DATA.DATASET_PATH,
             cfg.DATA.NUM_FRAMES,
+            alpha=cfg.SLOWFAST.ALPHA,
             dataset_type='train',
             transform_fn=train_transform,
             use_decord=cfg.DATA_LOADER.USE_DECORD,
@@ -205,7 +209,7 @@ def get_train_objects(cfg: Config, model, device: torch.device, video_ids=None):
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
     if cfg.EGL.ENABLED:
-        criterion = RRRLoss()
+        criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS)
     else:
         if cfg.MODEL.CLASS_WEIGHTS:
             weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)

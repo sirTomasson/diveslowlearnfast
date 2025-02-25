@@ -109,6 +109,7 @@ class Diving48Dataset(Dataset):
     def __init__(self,
                  dataset_path,
                  num_frames,
+                 alpha=1,
                  dataset_type='train',
                  dataset_version='V2',
                  temporal_random_jitter=0,
@@ -129,6 +130,7 @@ class Diving48Dataset(Dataset):
         self.annotations_path = os.path.join(dataset_path, f'Diving48_{dataset_version}_{dataset_type}.json')
         self.vocab_path = os.path.join(dataset_path, f'Diving48_vocab.json')
         self.num_frames = num_frames
+        self.alpha = alpha
         self.target_fps = target_fps
         self.transform_fn = transform_fn
         self.temporal_random_jitter = temporal_random_jitter
@@ -209,11 +211,12 @@ class Diving48Dataset(Dataset):
         return frames, io_time, transform_time
 
     def _read_mask(self, video_id, h, w):
-        mask_filename = os.path.join(self.masks_cache_dir, f'{video_id}.npy')
-        if os.path.exists(mask_filename):
-            return np.load(mask_filename)
+        mask_slow_filename = os.path.join(self.masks_cache_dir, 'slow', f'{video_id}.npy')
+        mask_fast_filename = os.path.join(self.masks_cache_dir, 'fast', f'{video_id}.npy')
+        if os.path.exists(mask_slow_filename) and os.path.exists(mask_fast_filename):
+            return np.load(mask_slow_filename), np.load(mask_fast_filename)
 
-        return np.zeros((1, self.num_frames, h, w), dtype=np.bool_)
+        return np.zeros((1, self.num_frames // self.alpha, h, w), dtype=np.bool_), np.zeros((1, self.num_frames, h, w), dtype=np.bool_)
 
     def __getitem__(self, index):
         video_id = self.data[index]['vid_name']
@@ -221,10 +224,10 @@ class Diving48Dataset(Dataset):
         frames, io_time, transform_time = self._read_frames(video_id)
         if self.masks_cache_dir:
             _, _, h, w = frames.shape
-            mask = self._read_mask(video_id, h, w)
-            return frames, label, io_time, transform_time, video_id, mask
+            mask_slow, mask_fast = self._read_mask(video_id, h, w)
+            return frames, label, io_time, transform_time, video_id, mask_slow, mask_fast
 
-        return frames, label, io_time, transform_time, video_id, False
+        return frames, label, io_time, transform_time, video_id, False, False
 
     def __len__(self):
         return self.num_videos
