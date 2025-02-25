@@ -61,15 +61,15 @@ class GradCAM:
             layer_name (str): name of the layer.
         """
 
-        def get_gradients(module, grad_input, grad_output):
+        def get_gradients(_module, _grad_input, grad_output):
             self.gradients[layer_name] = grad_output[0].detach()
 
-        def get_activations(module, input, output):
+        def get_activations(_module, _input, output):
             self.activations[layer_name] = output.clone().detach()
 
         target_layer = get_layer(self.model, layer_name=layer_name)
         target_layer.register_forward_hook(get_activations)
-        target_layer.register_backward_hook(get_gradients)
+        target_layer.register_full_backward_hook(get_gradients)
 
     def _register_hooks(self):
         """
@@ -153,11 +153,10 @@ class GradCAM:
             labels (Optional[tensor]): labels of the current input clips.
             alpha (float): transparency level of the heatmap, in the range [0, 1].
         Returns:
-            result_ls (list of tensor(s)): the visualized inputs.
+            localization_maps (list of tensor(s)): the visualized inputs.
             preds (tensor): shape (n_instances, n_class). Model predictions for `inputs`.
         """
-        result_ls = []
         localization_maps, preds = self._calculate_localization_map(
             inputs, labels=labels
         )
-        return result_ls, localization_maps, preds
+        return localization_maps, preds
