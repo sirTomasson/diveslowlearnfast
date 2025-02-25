@@ -38,6 +38,12 @@ def calc_accuracy(Y_true, Y_pred):
     Y_pred = np.array(Y_pred)
     return (Y_true == Y_pred).sum() / len(Y_true)
 
+def add_losses_entry(stats_db: StatsDB, losses, epoch, cfg: Config):
+    stats_db.add_loss(losses['total_loss'], epoch, 'loss', str(cfg.TRAIN.RESULT_DIR), 'train')
+    stats_db.add_loss(losses['gradient_loss_path_0'], epoch, 'slow', str(cfg.TRAIN.RESULT_DIR), 'train')
+    stats_db.add_loss(losses['gradient_loss_path_1'], epoch, 'fast', str(cfg.TRAIN.RESULT_DIR), 'train')
+    stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
+
 
 def run_train_epoch(model: nn.Module,
                     rrr_loss: RRRLoss | DualPathRRRLoss,
@@ -70,7 +76,8 @@ def run_train_epoch(model: nn.Module,
             )
 
             logits = model(inputs)
-            loss, _ = rrr_loss(logits, yb, inputs, [masks_slow, masks_fast])
+            loss, losses = rrr_loss(logits, yb, inputs, [masks_slow, masks_fast])
+            add_losses_entry(stats_db, losses, epoch, cfg)
             loss /= n_batches_per_step # scale loss by the number of batches in a step
             train_helper.backward(loss)
 

@@ -22,6 +22,26 @@ class StatsDB:
             split TEXT
         )
         """)
+        cur.execute("""CREATE TABLE IF NOT EXISTS losses
+        (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            epoch INTEGER,
+            created_at INTEGER,
+            tag INTEGER,
+            value REAL,
+            run_id TEXT, 
+            split TEXT
+        )
+        """)
+        self.con.commit()
+
+    def add_loss(self, loss, epoch, tag, run_id, split):
+        query = """INSERT INTO losses(epoch, created_at, tag, value, run_id, split) 
+        VALUES(?, ?, ?, ?, ?, ?)
+        """
+        data = [epoch, int(time.time() * 1000.0), tag, loss, run_id, split]
+        cur = self.con.cursor()
+        cur.execute(query, data)
         self.con.commit()
 
     def update(self, video_ids, preds, gts, run_id, mode, epoch):
