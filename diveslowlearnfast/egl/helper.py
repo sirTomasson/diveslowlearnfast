@@ -13,9 +13,14 @@ from diveslowlearnfast.train.helper import get_train_transform
 
 
 def get_difficult_video_ids(stats_db: StatsDB, epoch, cfg: Config):
+    if len(cfg.EGL.RUN_ID) > 0:
+        run_id = cfg.EGL.RUN_ID
+    else:
+        run_id = str(cfg.TRAIN.RESULT_DIR)
+
     difficult_samples = stats_db.get_difficult_samples(
         epoch_start=(epoch - 10),
-        run_id=str(cfg.TRAIN.RESULT_DIR),
+        run_id=run_id,
         split='train'
     )
     return list(map(lambda x: x[0], difficult_samples))

@@ -179,6 +179,7 @@ class EGLConfig:
     LOSS_FUNC: str = 'rrr'
     MASKS_PERIOD: int = 10
     MASKS_CACHE_DIR: Path = Path('results/.masks')
+    RUN_ID: str = ''
 
 
 @dataclass
