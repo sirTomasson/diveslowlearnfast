@@ -209,7 +209,7 @@ def get_train_objects(cfg: Config, model, device: torch.device, video_ids=None):
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
     if cfg.EGL.ENABLED:
-        criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS)
+        criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
     else:
         if cfg.MODEL.CLASS_WEIGHTS:
             weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)
