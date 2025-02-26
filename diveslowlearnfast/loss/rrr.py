@@ -70,7 +70,11 @@ def _normalise_gradients(gradients):
 class DualPathRRRLoss(nn.Module):
 
 
-    def __init__(self, lambdas=None, normalise_gradients=False, force_new_gradients=False):
+    def __init__(self,
+                 lambdas=None,
+                 normalise_gradients=False,
+                 force_new_gradients=False,
+                 skip_zero_masks=False):
         super().__init__()
         if lambdas is None:
             lambdas = [0.5e12, 0.5e12]
@@ -78,6 +82,7 @@ class DualPathRRRLoss(nn.Module):
         self.lambdas = lambdas
         self.normalise_gradients = normalise_gradients
         self.force_new_gradients = force_new_gradients
+        self.skip_zero_masks = skip_zero_masks
         self.cross_entropy = nn.CrossEntropyLoss()
 
     def forward(self, logits, targets, inputs, masks):
@@ -87,7 +92,15 @@ class DualPathRRRLoss(nn.Module):
             'ce_loss': ce_loss.item(),
         }
 
-        summed_log_probs = F.log_softmax(logits, dim=1).sum()
+        relevant_indices = _get_binary_index_mask(masks)
+        if self.skip_zero_masks and torch.sum(relevant_indices) == 0:
+            losses['total_loss'] = total_loss.item()
+            for idx in range(len(inputs)):
+                losses[f'gradient_loss_path_{idx}'] = 0
+            return total_loss, losses
+
+        relevant_logits = logits[relevant_indices]
+        summed_log_probs = F.log_softmax(relevant_logits, dim=1).sum()
 
         for idx, (inp, mask) in enumerate(zip(inputs, masks)):
             gradients = self._calculate_gradient(inp, summed_log_probs)
@@ -114,3 +127,8 @@ class DualPathRRRLoss(nn.Module):
 
         logger.debug('Gradients exist on "inp", reusing existing gradients')
         return inp.grad
+
+
+def _get_binary_index_mask(masks):
+    masks = masks[0] # the slow mask
+    return torch.sum(masks, dim=(1, 2, 3, 4)) > 0
