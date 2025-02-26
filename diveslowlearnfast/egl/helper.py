@@ -43,7 +43,7 @@ def purge_masks_cache(masks_cache_dir):
 def augment_samples(model, videos_ids, cfg: Config, device: torch.device):
     train_loader, _ = get_difficult_samples_loader_and_dataset(cfg, videos_ids)
     explainer = ExplainerStrategy.get_explainer(model, cfg, device)
-    generate_masks(train_loader, explainer, cfg)
+    generate_masks(train_loader, explainer, cfg, device)
 
 
 def get_difficult_samples_loader_and_dataset(cfg, video_ids):

@@ -19,6 +19,9 @@ class GradCamExplainer(nn.Module):
                                cfg.GRADCAM.COLORMAP)
 
     def forward(self, inputs, y=None, **kwargs):
+        if y is not None:
+            y = y.to(self.device)
+
         localisation_maps, logits = self.gradcam(inputs, y)
         return localisation_maps, logits
 

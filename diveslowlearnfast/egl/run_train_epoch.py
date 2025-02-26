@@ -1,4 +1,5 @@
-from typing import Iterator
+import logging
+import os
 
 import torch
 
@@ -15,6 +16,9 @@ from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import Statistics
 
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
+
+logger = logging.getLogger(__name__)
 
 def get_n_batches_per_step(cfg: Config):
     n_batches = cfg.TRAIN.MACRO_BATCH_SIZE // cfg.TRAIN.BATCH_SIZE
@@ -72,7 +76,8 @@ def run_train_epoch(model: nn.Module,
             inputs = to_slowfast_inputs(
                 xb,
                 alpha=cfg.SLOWFAST.ALPHA,
-                requires_grad=True
+                requires_grad=True,
+                device=device
             )
 
             logits = model(inputs)

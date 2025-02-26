@@ -32,7 +32,7 @@ def get_batch(loader: Iterator,
         )
     xb = xb.to(device)
     xb.requires_grad = data_requires_grad
-    return xb, yb.to(device), video_ids, masks_slow, masks_fast
+    return xb, yb.to(device), video_ids, masks_slow.to(device), masks_fast.to(device)
 
 
 def get_aug_paras(cfg: Config):

@@ -146,7 +146,7 @@ def main():
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
 
-    if cfg.EGL.ENABLED:
+    if cfg.EGL.ENABLED and cfg.EGL.RECREATE_MASKS:
         logger.info('Generating masks for difficult samples')
         video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
         logger.debug(f'video_ids = {video_ids}')

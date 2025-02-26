@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import torch
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
@@ -35,7 +36,7 @@ def _create_masks_cache_dirs_if_not_exist(cfg):
         os.makedirs(fast_masks_dir)
 
 
-def generate_masks(loader, explainer, cfg: Config):
+def generate_masks(loader, explainer, cfg: Config, device: torch.device=torch.device('cpu')):
     _create_masks_cache_dirs_if_not_exist(cfg)
 
     loader = iter(loader)
@@ -45,7 +46,8 @@ def generate_masks(loader, explainer, cfg: Config):
         inputs = to_slowfast_inputs(
             xb,
             alpha=cfg.SLOWFAST.ALPHA,
-            requires_grad=True
+            requires_grad=True,
+            device=device
         )
         localisation_maps, _logits = explainer(inputs, yb)
         masks = [_generate_masks(localisation_map, invert=cfg.EGL.INVERT_MASKS, percentile=cfg.EGL.MASK_PERCENTILE) for localisation_map in localisation_maps]
