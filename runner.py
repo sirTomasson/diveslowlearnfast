@@ -101,7 +101,8 @@ def main():
         )
         start_epoch = epoch + 1
 
-    print(f'Start training model:')
+
+    print(f'Start/Resume training model from epoch = {start_epoch}:')
     parameter_count = get_parameter_count(model)
     print(f'parameter count = {parameter_count}')
     # 4bytes x 3 (1model + 1gradient + 1optimiser)
@@ -148,6 +149,7 @@ def main():
 
     if cfg.EGL.ENABLED and cfg.EGL.RECREATE_MASKS:
         logger.info('Generating masks for difficult samples')
+        print(f"run_ids = {stats_db.execute_query('SELECT DISTINCT(run_id) FROM stats')}")
         video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
         logger.debug(f'video_ids = {video_ids}')
         logger.debug(f'purging masks cache')
@@ -170,6 +172,8 @@ def main():
                 f'Threshold = {cfg.DATA.THRESHOLD} and cfg.DATA.SEED == -1, reloading dataset and loader at epoch {epoch}')
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
+        logger.info(f'Start training with dataset of size = {len(train_dataset)}')
+        logger.info(f'Start training with loader of size = {len(train_loader)}')
         if cfg.EGL.ENABLED:
             train_acc, train_loss = run_egl_train_epoch(
                 model,

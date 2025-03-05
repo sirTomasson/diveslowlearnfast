@@ -64,6 +64,7 @@ def run_train_epoch(model: nn.Module,
     stats = Statistics()
     Y_true = []
     Y_pred = []
+    V_ids = []
     running_loss = 0.0
     for i in batch_bar:
         with stats.timer('batch_time'):
@@ -90,17 +91,17 @@ def run_train_epoch(model: nn.Module,
 
             Y_pred.extend(logits.argmax(dim=-1).detach().cpu().tolist())
             Y_true.extend(yb.detach().cpu().tolist())
+            V_ids.extend(video_ids)
 
             if should_step(i, n_batches_per_step, loader):
                 step(optimiser, scaler)
-
-                stats_db.update(video_ids, Y_pred, Y_true, str(cfg.TRAIN.RESULT_DIR), 'train', epoch)
                 stats.update(
                     accuracy=calc_accuracy(Y_true, Y_pred),
                     loss=running_loss
                 )
+                stats_db.update(V_ids, Y_pred, Y_true, str(cfg.TRAIN.RESULT_DIR), 'train', epoch)
 
-                running_loss = 0.0; Y_true = []; Y_pred = []
+                running_loss = 0.0; Y_true = []; Y_pred = []; V_ids = []
 
         batch_bar.set_postfix(stats.get_formatted_stats(
             'current_batch_time',
