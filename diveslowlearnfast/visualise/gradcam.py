@@ -2,26 +2,7 @@
 import torch
 import torch.nn.functional as F
 
-
-def get_layer(model, layer_name):
-    """
-    Return the targeted layer (nn.Module Object) given a hierarchical layer name,
-    separated by /.
-    Args:
-        model (model): model to get layers from.
-        layer_name (str): name of the layer.
-    Returns:
-        prev_module (nn.Module): the layer from the model with `layer_name` name.
-    """
-    layer_ls = layer_name.split("/")
-    prev_module = model
-    for layer in layer_ls:
-        prev_module = prev_module._modules[layer]
-
-    return prev_module
-
-
-
+from diveslowlearnfast.models.utils import get_layer
 
 class GradCAM:
     """

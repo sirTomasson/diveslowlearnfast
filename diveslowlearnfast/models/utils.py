@@ -54,7 +54,26 @@ def to_slowfast_inputs(xb, alpha, requires_grad=False, device: torch.device=torc
     # reduce the number of frames by the alpha ratio
     # B x C x T / alpha x H x W
     xb_slow = xb[:, :, ::alpha].to(device)
-    xb_fast.requires_grad = requires_grad
-    xb_slow.requires_grad = requires_grad
+    if requires_grad:
+        xb_fast.requires_grad_(requires_grad)
+        xb_slow.requires_grad_(requires_grad)
 
     return [xb_slow, xb_fast]
+
+
+def get_layer(model, layer_name):
+    """
+    Return the targeted layer (nn.Module Object) given a hierarchical layer name,
+    separated by /.
+    Args:
+        model (model): model to get layers from.
+        layer_name (str): name of the layer.
+    Returns:
+        prev_module (nn.Module): the layer from the model with `layer_name` name.
+    """
+    layer_ls = layer_name.split("/")
+    prev_module = model
+    for layer in layer_ls:
+        prev_module = prev_module._modules[layer]
+
+    return prev_module
