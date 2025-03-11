@@ -192,9 +192,21 @@ class GradCAMConfig:
     TARGET_LAYERS: list[str] = field(default_factory=lambda: ['s5/pathway0_res2', 's5/pathway1_res2'])
     COLORMAP: str = 'viridis'
 
+
 @dataclass
 class RRRConfig:
-    LAMBDAS: list[float] = field(default_factory=lambda: [0.5e11, 0.5e10])
+    LAMBDAS: list[float] = field(default_factory=lambda: [1000.0, 1000.0])
+
+
+@dataclass
+class ConfoundersConfig:
+    ENABLED: bool = False
+    SIZE: int = 24
+    GRID_SIZE: int = 48
+    CHANNEL: int = 1
+    INPLACE: bool = True
+    NUM_INCLUDE_CLASSES: int = 48
+
 
 @dataclass
 class Config:
@@ -216,3 +228,4 @@ class Config:
     EGL: EGLConfig = field(default_factory=EGLConfig)
     GRADCAM: GradCAMConfig = field(default_factory=GradCAMConfig)
     RRR: RRRConfig = field(default_factory=RRRConfig)
+    CONFOUNDERS: ConfoundersConfig = field(default_factory=ConfoundersConfig)

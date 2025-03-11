@@ -1,4 +1,9 @@
-__all__ = ['Permute', 'CenterCropVideo', 'ToTensor4D', 'RandomRotateVideo']
+__all__ = [
+    'Permute',
+    'CenterCropVideo',
+    'ToTensor4D',
+    'RandomRotateVideo',
+]
 
 from .permute import Permute
 from .center_crop_video import CenterCropVideo

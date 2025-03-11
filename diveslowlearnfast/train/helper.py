@@ -2,6 +2,8 @@ from typing import Iterator
 
 import pytorchvideo
 import torch
+import random
+
 from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize
 from torch import autocast
 from torch.amp import GradScaler
@@ -9,7 +11,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
 
 from diveslowlearnfast.config import Config
-from diveslowlearnfast.datasets import Diving48Dataset
+from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
 from diveslowlearnfast.loss.rrr import DualPathRRRLoss
 from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
@@ -156,8 +158,17 @@ def get_include_labels(cfg):
 def get_train_loader_and_dataset(cfg, video_ids=None):
     train_transform = get_train_transform(cfg)
 
+    # take a random sample of n classes
+    include_labels = None
+    if cfg.CONFOUNDERS.ENABLED and\
+            cfg.CONFOUNDERS.GRID_SIZE > cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES:
+        include_labels = random.sample(
+            range(cfg.CONFOUNDERS.GRID_SIZE),
+            cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES
+        )
+
     if cfg.EGL.ENABLED:
-        train_dataset = Diving48Dataset(
+        return_train_dataset = Diving48Dataset(
             cfg.DATA.DATASET_PATH,
             cfg.DATA.NUM_FRAMES,
             alpha=cfg.SLOWFAST.ALPHA,
@@ -171,9 +182,10 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
             masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR,
             video_ids=video_ids,
+            include_labels=include_labels,
         )
     else:
-        train_dataset = Diving48Dataset(
+        return_train_dataset = Diving48Dataset(
             cfg.DATA.DATASET_PATH,
             cfg.DATA.NUM_FRAMES,
             alpha=cfg.SLOWFAST.ALPHA,
@@ -186,7 +198,20 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             threshold=cfg.DATA.THRESHOLD,
             use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
             video_ids=video_ids,
+            include_labels=include_labels,
         )
+
+    # Here we do a cheeky swap with the wrapper and the dataset we actually want to return
+    # so essentially we are supplying the dataloader our ConfounderWrapper and returning the
+    # underlying dataset a.k.a return_train_dataset. The reason is that downstream code might use
+    # properties on `Diving48Dataset` that is not available on `Diving48ConfounderDatasetWrapper` ;)
+    if cfg.CONFOUNDERS.ENABLED:
+        train_dataset = Diving48ConfounderDatasetWrapper(
+            return_train_dataset,
+            cfg
+        )
+    else:
+        train_dataset = return_train_dataset
 
     train_loader = DataLoader(
         train_dataset,
@@ -195,7 +220,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         shuffle=True,
     )
-    return train_loader, train_dataset
+    return train_loader, return_train_dataset
 
 
 def get_train_objects(cfg: Config, model, device: torch.device, video_ids=None):
