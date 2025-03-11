@@ -1,12 +1,39 @@
 import time
 import os
 import unittest
-from contextlib import contextmanager
-
-import numpy as np
 import sqlite3
 
+import numpy as np
+
+from contextlib import contextmanager
+from typing import List
+
+import pandas as pd
+
 from diveslowlearnfast.config import Config
+
+
+def get_tuple(result: List[List], **_kwargs):
+    return tuple(map(lambda x: x[0], result))
+
+
+def get_value(result: List[List], **_kwargs):
+    return get_tuple(result)[0]
+
+
+def get_dict(result: List[List], columns: List[str], **_kwargs):
+    return {column: get_column(idx)(result) for idx, column in enumerate(columns)}
+
+
+def get_df(result: List[List], columns: List[str], **_kwargs):
+    return pd.DataFrame(get_dict(result, columns=columns))
+
+
+def get_column(column_idx):
+    def _inner(result, **_kwargs):
+        return list(map(lambda x: x[column_idx], result))
+
+    return _inner
 
 
 class StatsDB:
@@ -52,20 +79,40 @@ class StatsDB:
         VALUES(?, ?, ?, ?, ?, ?)
         """
         # explicitly cast to ints since the numpy definition is not supported by the db
-        data = [[epoch, video_id, int(pred), int(gt), run_id, mode] for video_id, pred, gt  in zip(video_ids, preds, gts)]
+        data = [[epoch, video_id, int(pred), int(gt), run_id, mode] for video_id, pred, gt in
+                zip(video_ids, preds, gts)]
         cur = self.con.cursor()
         cur.executemany(query, data)
         self.con.commit()
 
+    def execute_query(self, query, *args, data=None, extractor=None, return_columns=False, **kwargs):
+        if data is None and args is not None:
+            data = tuple(args)
 
-    def execute_query(self, query, data=None):
-        if data is None:
-            return [list(row) for row in self.con.execute(query)]
+        cursor = self.con.cursor()
+        try:
+            if data is None:
+                result = [list(row) for row in cursor.execute(query)]
+            else:
+                result = [list(row) for row in cursor.execute(query, data)]
 
-        return [list(row) for row in self.con.execute(query, data)]
+            columns = [description[0] for description in cursor.description]
+
+            if extractor is None:
+                if return_columns:
+                    return columns, result
+                return result
+
+            result = extractor(result, columns=columns)
+            if return_columns:
+                return columns, result
+
+            return result
+        finally:
+            cursor.close()
 
 
-    def get_sample_accuracy(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch'):
+    def get_sample_accuracy(self, epoch_start, run_id, split, epoch_end: int | str = 'max_epoch', **kwargs):
         data = [epoch_start]
         if epoch_end == 'max_epoch':
             epoch_end = ''
@@ -88,16 +135,15 @@ class StatsDB:
             GROUP BY video_id, gt
         ) ORDER BY acc
         """
-        return self.execute_query(query, tuple(data))
+        return self.execute_query(query, *data, **kwargs)
 
-
-    def get_lowest_percentile(self, epoch_start, run_id, split, epoch_end: int | str='max_epoch', percentile=5):
-        sample_acc = self.get_sample_accuracy(epoch_start, run_id, split, epoch_end)
+    def get_lowest_percentile(self, epoch_start, run_id, split, epoch_end: int | str = 'max_epoch', percentile=5,
+                              **kwargs):
+        sample_acc = self.get_sample_accuracy(epoch_start, run_id, split, epoch_end, **kwargs)
         top_n = int(len(sample_acc) * (percentile / 100))
         return sample_acc[:top_n]
 
-
-    def get_below_median_samples(self, epoch_start, run_id, split, epoch_end: int | str= 'max_epoch'):
+    def get_below_median_samples(self, epoch_start, run_id, split, epoch_end: int | str = 'max_epoch', **kwargs):
         data = [epoch_start]
         if epoch_end == 'max_epoch':
             epoch_end = ''
@@ -135,8 +181,7 @@ class StatsDB:
         WHERE acc < median
         ORDER BY acc
         """
-        return self.execute_query(query, tuple(data))
-
+        return self.execute_query(query, *data, **kwargs)
 
     def get_ytrue_and_pred(self, epoch, run_id, split):
         result = self.execute_query("""SELECT gt, pred FROM stats
@@ -158,6 +203,7 @@ def wps_strategy(stats_db: StatsDB, cfg: Config):
         def _wsp_percentile_strategy(epoch_start, run_id, split, epoch_end: int | str = 'max_epoch'):
             return stats_db.get_lowest_percentile(epoch_start, run_id, split, epoch_end,
                                                   percentile=cfg.EGL.WORST_PERFORMER_PERCENTILE)
+
         return _wsp_percentile_strategy
 
 
@@ -198,6 +244,7 @@ class PerSampleStatisticsTest(unittest.TestCase):
     def tearDown(self):
         if os.path.exists('./stats.db'):
             os.remove('./stats.db')
+
 
 class Statistics:
 
@@ -253,13 +300,12 @@ class Statistics:
         else:
             return self.stats[key]
 
-
     @contextmanager
     def timer(self, key):
         start = time.time()
         yield
         elapsed = time.time() - start
-        self.update(**{ key: elapsed })
+        self.update(**{key: elapsed})
 
 
 class StatisticsTest(unittest.TestCase):
@@ -285,12 +331,10 @@ class StatisticsTest(unittest.TestCase):
         self.assertAlmostEqual(stats.mean_accuracy(), 0.33, places=2)
         self.assertEqual(stats.mean_loss(), 4.0)
 
-
     def test_timer(self):
         stats = Statistics()
         with stats.timer('batch_time'):
-            _ = [i*i for i in range(1000)]
+            _ = [i * i for i in range(1000)]
 
         self.assertGreater(stats.mean_batch_time(), 0.0)
         self.assertIsNone(stats.mean_loss())
-
