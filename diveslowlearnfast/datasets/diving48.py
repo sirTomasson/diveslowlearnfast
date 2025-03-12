@@ -11,10 +11,30 @@ import numpy as np
 
 from torch.utils.data import Dataset
 
+
 logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
 
+
+def extend_under_represented_classes(data):
+    labels = list(map(lambda x: x['label'], data))
+
+    unique, counts = np.unique(labels, return_counts=True)
+    max_count = np.max(counts)
+
+    new_data = []
+    start = 0
+    for count in counts:
+        if count >= max_count:
+            new_data.extend(data[start:start+count])
+            start += count
+            continue
+
+        new_data.extend(data[start:start+count] * (max_count // count))
+        start += count
+
+    return new_data
 
 def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
                       use_sampling_ratio=False, **kwargs):
@@ -123,7 +143,8 @@ class Diving48Dataset(Dataset):
                  include_labels=None,
                  use_sampling_ratio=False,
                  video_ids=None,
-                 masks_cache_dir=None):
+                 masks_cache_dir=None,
+                 extend_classes=False):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -143,6 +164,7 @@ class Diving48Dataset(Dataset):
         self.use_sampling_ratio = use_sampling_ratio
         self.include_video_ids = video_ids
         self.masks_cache_dir = masks_cache_dir
+        self.extend_classes = extend_classes
         self._init_dataset()
 
     def _init_dataset(self):
@@ -160,6 +182,9 @@ class Diving48Dataset(Dataset):
 
         if self.include_video_ids is not None:
             self.data = list(filter(lambda video: video['vid_name'] in self.include_video_ids, self.data))
+
+        if self.extend_classes:
+            self.data = extend_under_represented_classes(self.data)
 
     def _filter_data(self):
         # convert data to { label: [ {...}, {...}.. ] }

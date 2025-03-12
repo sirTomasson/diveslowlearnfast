@@ -23,6 +23,7 @@ class DataConfig:
     MULTI_THREAD_DECODE: bool = False
     THRESHOLD: int = -1
     SEED: int = -1
+    EXTEND_CLASSES: bool = False
 
 
 @dataclass

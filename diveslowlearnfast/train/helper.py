@@ -183,6 +183,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR,
             video_ids=video_ids,
             include_labels=include_labels,
+            extend_classes=cfg.DATA.EXTEND_CLASSES,
         )
     else:
         return_train_dataset = Diving48Dataset(
@@ -199,6 +200,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
             video_ids=video_ids,
             include_labels=include_labels,
+            extend_classes=cfg.DATA.EXTEND_CLASSES,
         )
 
     # Here we do a cheeky swap with the wrapper and the dataset we actually want to return
