@@ -3,14 +3,14 @@ import os
 import unittest
 import sqlite3
 
+import pandas as pd
 import numpy as np
 
+from diveslowlearnfast.config import Config
+
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 from contextlib import contextmanager
 from typing import List
-
-import pandas as pd
-
-from diveslowlearnfast.config import Config
 
 
 def get_tuple(result: List[List], **_kwargs):
@@ -111,6 +111,8 @@ class StatsDB:
         finally:
             cursor.close()
 
+        return None
+
 
     def get_sample_accuracy(self, epoch_start, run_id, split, epoch_end: int | str = 'max_epoch', **kwargs):
         data = [epoch_start]
@@ -183,15 +185,27 @@ class StatsDB:
         """
         return self.execute_query(query, *data, **kwargs)
 
-    def get_ytrue_and_pred(self, epoch, run_id, split):
+    def get_ytrue_and_pred(self, epoch, run_id, split, **kwargs):
         result = self.execute_query("""SELECT gt, pred FROM stats
         WHERE epoch = ? AND split = ? AND run_id = ?
-        """, (epoch, split, run_id))
+        """, epoch, split, run_id, **kwargs)
         result = np.array(result)
         Y_true = result[:, 0]
         Y_pred = result[:, 1]
         labels = np.unique(Y_true)
         return Y_true, Y_pred, labels
+
+    def confusion_matrix(self, epoch, run_id, split, **kwargs):
+        Y_true, Y_pred, labels = self.get_ytrue_and_pred(epoch, run_id, split, **kwargs)
+        return confusion_matrix(Y_true, Y_pred, labels=labels), labels
+
+
+    def per_class_accuracy(self, epoch, run_id, split, **kwargs):
+        matrix, labels = self.confusion_matrix(epoch, run_id, split, **kwargs)
+        totals = np.array(matrix.sum(axis=1)) + 1e-9
+        diagonals = np.array(matrix.diagonal())
+        return (diagonals / totals), labels
+
 
 
 def wps_strategy(stats_db: StatsDB, cfg: Config):

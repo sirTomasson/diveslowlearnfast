@@ -87,12 +87,12 @@ def plot_confusion_matrix(confusion_matrix, save_path=None, labels=None, **_kwar
                      ha="center", va="center", color="black")
 
     plt.tight_layout()
-    if save_path:
+    if save_path is not None:
         plt.savefig(save_path)
     plt.show()
 
 
-def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
+def plot_per_class_accuracy(confusion_matrix, stats_path=None, labels=None):
     # to avoid divide by zero
     totals = np.array(confusion_matrix.sum(axis=1)) + 1e-9
     diagonals = np.array(confusion_matrix.diagonal())
@@ -142,7 +142,9 @@ def plot_per_class_accuracy(confusion_matrix, stats_path, labels=None):
 
     plt.grid(axis='y')
     plt.tight_layout()
-    plt.savefig(stats_path.parent / 'per_class_accuracy.png')
+    if stats_path is not None:
+        plt.savefig(stats_path.parent / 'per_class_accuracy.png')
+
     plt.show()
 
 
