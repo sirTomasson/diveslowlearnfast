@@ -4,7 +4,7 @@ from torch import nn
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.visualise.gradcam import GradCAM
-
+from diveslowlearnfast.datasets import superimpose_confounder
 
 class GradCamExplainer(nn.Module):
 
@@ -30,11 +30,28 @@ class ExplainerStrategy:
     @staticmethod
     def get_explainer(model: nn.Module,
                       cfg: Config,
-                      device: torch.device) -> nn.Module:
+                      device: torch.device):
 
-        assert cfg.EGL.METHOD in ['gradcam']
+        assert cfg.EGL.METHOD in ['gradcam', 'confounder']
         if cfg.EGL.METHOD == 'gradcam':
             return GradCamExplainer(model, cfg=cfg, device=device)
+
+        elif cfg.EGL.METHOD == 'confounder':
+            def _confounder_explainer(inputs, y):
+                result = []
+                for inp in inputs:
+                    sub_result = []
+                    for x in inp:
+                        x = torch.zeros_like(x)
+                        x = superimpose_confounder(x, y, inplace=True)
+                        x = torch.mean(x, dim=0, keepdim=True)
+                        sub_result.append(x)
+
+                    result.append(torch.stack(sub_result))
+
+                return result, None
+
+            return _confounder_explainer
 
         raise ValueError('Unsupported method')
 

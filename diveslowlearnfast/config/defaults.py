@@ -24,6 +24,7 @@ class DataConfig:
     THRESHOLD: int = -1
     SEED: int = -1
     EXTEND_CLASSES: bool = False
+    INCLUDE_LABELS: list[int] = field(default_factory=lambda: [])
 
 
 @dataclass

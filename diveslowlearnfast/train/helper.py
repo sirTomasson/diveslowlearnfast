@@ -160,12 +160,15 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
 
     # take a random sample of n classes
     include_labels = None
-    if cfg.CONFOUNDERS.ENABLED and\
+    if cfg.CONFOUNDERS.ENABLED and \
             cfg.CONFOUNDERS.GRID_SIZE > cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES:
         include_labels = random.sample(
             range(cfg.CONFOUNDERS.GRID_SIZE),
             cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES
         )
+
+    if len(cfg.DATA.INCLUDE_LABELS) > 0:
+        include_labels = cfg.DATA.INCLUDE_LABELS
 
     if cfg.EGL.ENABLED:
         return_train_dataset = Diving48Dataset(
@@ -225,7 +228,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, return_train_dataset
 
 
-def get_train_objects(cfg: Config, model, device: torch.device=torch.device('cpu'), video_ids=None):
+def get_train_objects(cfg: Config, model, device: torch.device = torch.device('cpu'), video_ids=None):
     optimiser = torch.optim.SGD(
         model.parameters(),
         lr=cfg.SOLVER.BASE_LR,
