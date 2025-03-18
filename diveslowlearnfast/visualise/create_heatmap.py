@@ -39,8 +39,8 @@ def create_heatmaps(inputs, localisation_maps, mean, std, alpha=0.5, colormap='v
         )
         heatmap = torch.from_numpy(heatmap)
         curr_inp = alpha * heatmap + (1 - alpha) * curr_inp
-        # Permute inp to (B, T, C, H, W)
-        curr_inp = curr_inp.permute(0, 1, 4, 2, 3)
+        # Permute inp to (B, C, T, H, W)
+        curr_inp = curr_inp.permute(0, 4, 1, 2, 3)
         results.append(curr_inp)
 
     return results

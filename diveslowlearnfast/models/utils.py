@@ -7,6 +7,7 @@ import os
 from glob import glob
 
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.models import SlowFast
 
 
 def save_checkpoint(model, optimiser, epoch: int, cfg: Config, filename=None):
@@ -25,10 +26,16 @@ def save_checkpoint(model, optimiser, epoch: int, cfg: Config, filename=None):
     torch.save(checkpoint, path)
 
 
-def load_checkpoint(model, optimiser, checkpoint_path: str | Path, device: torch.device):
+def model_from_checkpoint(cfg: Config, path: str | Path, device: torch.device=torch.device('cpu')):
+    model = SlowFast(cfg)
+    return load_checkpoint(model, path, device=device)[0]
+
+def load_checkpoint(model, checkpoint_path: str | Path, optimiser=None, device: torch.device = torch.device('cpu')):
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state'])
-    optimiser.load_state_dict(checkpoint['optimizer_state'])
+    if optimiser is not None:
+        optimiser.load_state_dict(checkpoint['optimizer_state'])
+
     return model, optimiser, checkpoint['epoch']
 
 

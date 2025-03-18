@@ -113,7 +113,6 @@ class StatsDB:
 
         return None
 
-
     def get_sample_accuracy(self, epoch_start, run_id, split, epoch_end: int | str = 'max_epoch', **kwargs):
         data = [epoch_start]
         if epoch_end == 'max_epoch':
@@ -199,7 +198,6 @@ class StatsDB:
         Y_true, Y_pred, labels = self.get_ytrue_and_pred(epoch, run_id, split, **kwargs)
         return confusion_matrix(Y_true, Y_pred, labels=labels), labels
 
-
     def per_class_accuracy(self, epoch, run_id, split, **kwargs):
         matrix, labels = self.confusion_matrix(epoch, run_id, split, **kwargs)
         totals = np.array(matrix.sum(axis=1)) + 1e-9
@@ -207,18 +205,29 @@ class StatsDB:
         return (diagonals / totals), labels
 
 
-
 def wps_strategy(stats_db: StatsDB, cfg: Config):
     strategy = cfg.EGL.WORST_PERFORMER_STRATEGY
-    assert strategy in ['median', 'percentile']
+    assert strategy in ['median', 'percentile', 'all']
     if strategy == 'median':
         return stats_db.get_below_median_samples
+
     elif strategy == 'percentile':
         def _wsp_percentile_strategy(epoch_start, run_id, split, epoch_end: int | str = 'max_epoch'):
             return stats_db.get_lowest_percentile(epoch_start, run_id, split, epoch_end,
                                                   percentile=cfg.EGL.WORST_PERFORMER_PERCENTILE)
 
         return _wsp_percentile_strategy
+
+    elif strategy == 'all':
+        def _wsp_all_strategy(epoch_start, run_id, split, _epoch_end: int | str = 'max_epoch'):
+            return stats_db.execute_query("""SELECT DISTINCT(video_id)
+            FROM stats
+            WHERE split = ?
+            AND epoch >= ?
+            AND run_id = ?
+            """, split, epoch_start, run_id)
+
+        return _wsp_all_strategy
 
 
 class PerSampleStatisticsTest(unittest.TestCase):

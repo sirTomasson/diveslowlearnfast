@@ -4,9 +4,16 @@ __all__ = [
     'get_train_transform',
     'get_batch',
     'frameshow',
+    'load_checkpoint',
+    'model_from_checkpoint',
+    'create_heatmaps',
 ]
 
 from .train.helper import get_train_transform, get_test_transform, get_batch
 from .utils import tensor_denorm, tensor_min_max_norm
 from .datasets import superimpose_confounder
+from .datasets.utils import get_sample
 from .visualise import frameshow
+from .models.utils import load_checkpoint, model_from_checkpoint, to_slowfast_inputs
+from .train.helper import get_train_objects
+from .visualise.create_heatmap import create_heatmaps
