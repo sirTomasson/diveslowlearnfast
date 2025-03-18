@@ -26,6 +26,9 @@ def superimpose_confounder(
     if not inplace:
         x = x.clone()
 
+    if type(y) == torch.Tensor:
+        y = y.item()
+
     _, _, H, W = x.shape
 
     g = math.sqrt(grid_size)

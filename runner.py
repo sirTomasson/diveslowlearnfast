@@ -95,8 +95,8 @@ def main():
     if cfg.TRAIN.AUTO_RESUME and checkpoint_path is not None:
         model, optimiser, epoch = load_checkpoint(
             model,
-            optimiser,
             checkpoint_path,
+            optimiser,
             device
         )
         start_epoch = epoch + 1

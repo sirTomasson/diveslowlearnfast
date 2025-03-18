@@ -37,11 +37,11 @@ class ExplainerStrategy:
             return GradCamExplainer(model, cfg=cfg, device=device)
 
         elif cfg.EGL.METHOD == 'confounder':
-            def _confounder_explainer(inputs, y):
+            def _confounder_explainer(inputs, yb):
                 result = []
                 for inp in inputs:
                     sub_result = []
-                    for x in inp:
+                    for x, y in zip(inp, yb):
                         x = torch.zeros_like(x)
                         x = superimpose_confounder(x, y, inplace=True)
                         x = torch.mean(x, dim=0, keepdim=True)
