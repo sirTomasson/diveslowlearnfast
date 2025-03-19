@@ -180,7 +180,6 @@ class EGLConfig:
     METHOD: str = 'gradcam'
     LOSS_FUNC: str = 'rrr'
     MASKS_PERIOD: int = 10
-    RECREATE_MASKS: bool = False
     MASKS_CACHE_DIR: Path = Path('results/.masks')
     INVERT_MASKS: bool = False
     MASK_PERCENTILE: int = 95

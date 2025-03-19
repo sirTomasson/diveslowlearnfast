@@ -5,7 +5,7 @@ import logging
 
 from tqdm import tqdm
 
-from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config
+from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config, Config
 from diveslowlearnfast.eval.run_eval_epoch import run_eval_epoch
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count, \
     load_checkpoint_compat
@@ -33,6 +33,35 @@ def print_device_props(device):
     print(f"Device: {device_props.name}")
     print(f"Total memory: {device_props.total_memory / 1024 ** 2:.2f} MB")
     print(f"GPU number: {device_props.major}.{device_props.minor}")
+
+
+def masks_exist(cfg: Config):
+    slow_masks_dir = os.path.join(cfg.EGL.MASKS_CACHE_DIR, 'slow')
+    fast_masks_dir = os.path.join(cfg.EGL.MASKS_CACHE_DIR, 'fast')
+    slow_masks_exist = os.path.isdir(slow_masks_dir) and len(os.listdir(slow_masks_dir)) > 0
+    fast_masks_exist = os.path.isdir(fast_masks_dir) and len(os.listdir(fast_masks_dir)) > 0
+    return slow_masks_exist and fast_masks_exist
+
+def should_generate_masks(cfg: Config, epoch):
+    if not cfg.EGL.ENABLED:
+        return False
+
+    if not masks_exist(cfg):
+        return True
+
+    return cfg.EGL.MASKS_PERIOD != -1 and (epoch % cfg.EGL.MASKS_PERIOD) == 0
+
+def generate_masks(stats, epoch, cfg, model, device):
+    logger.info('Generating masks for difficult samples')
+    video_ids = egl_helper.get_difficult_video_ids(stats, epoch, cfg)
+    logger.debug(f'video_ids = {video_ids}')
+    logger.debug(f'purging masks cache')
+    egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
+
+    if len(video_ids) > 0:
+        egl_helper.augment_samples(model, video_ids, cfg, device)
+    else:
+        logger.warning('No video_ids to generate masks for!')
 
 
 def main():
@@ -147,22 +176,12 @@ def main():
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
 
-    if cfg.EGL.ENABLED and cfg.EGL.RECREATE_MASKS:
-        logger.info('Generating masks for difficult samples')
-        video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
-        logger.debug(f'video_ids = {video_ids}')
-        logger.debug(f'purging masks cache')
-        egl_helper.purge_masks_cache(cfg.EGL.MASKS_CACHE_DIR)
-
-        if len(video_ids) > 0:
-            egl_helper.augment_samples(model, video_ids, cfg, device)
-        else:
-            logger.error('No video_ids to generate masks for, exiting!')
-            return
-
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
+        if should_generate_masks(cfg, epoch):
+            generate_masks(stats_db, start_epoch, cfg, model, device)
+
         # if the threshold is set and the seed is None we want to reload the dataset and loader at each epoch
         # this will ensure a new sample from the dataset with the threshold is drawn so the model will see a higher
         # variety of data.
