@@ -194,6 +194,20 @@ class StatsDB:
         labels = np.unique(Y_true)
         return Y_true, Y_pred, labels
 
+
+    def accuracy(self, epoch, split, run_id, **kwargs):
+        return self.execute_query("""SELECT (correct_n / n) as acc FROM(
+                    SELECT
+                        epoch,
+                        CAST(SUM(CASE WHEN pred = gt THEN 1 ELSE 0 END) as REAL) as correct_n,
+                        CAST(COUNT(*) as REAL) as n
+                    FROM stats
+                    WHERE epoch = ?
+                    AND run_id = ?
+                    AND split = ?
+                )
+        """, epoch, run_id, split, **kwargs)
+
     def confusion_matrix(self, epoch, run_id, split, **kwargs):
         Y_true, Y_pred, labels = self.get_ytrue_and_pred(epoch, run_id, split, **kwargs)
         return confusion_matrix(Y_true, Y_pred, labels=labels), labels
