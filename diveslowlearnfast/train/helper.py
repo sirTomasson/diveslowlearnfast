@@ -158,15 +158,7 @@ def get_include_labels(cfg):
 def get_train_loader_and_dataset(cfg, video_ids=None):
     train_transform = get_train_transform(cfg)
 
-    # take a random sample of n classes
     include_labels = None
-    if cfg.CONFOUNDERS.ENABLED and \
-            cfg.CONFOUNDERS.GRID_SIZE > cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES:
-        include_labels = random.sample(
-            range(cfg.CONFOUNDERS.GRID_SIZE),
-            cfg.CONFOUNDERS.NUM_INCLUDE_CLASSES
-        )
-
     if len(cfg.DATA.INCLUDE_LABELS) > 0:
         include_labels = cfg.DATA.INCLUDE_LABELS
 

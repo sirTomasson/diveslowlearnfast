@@ -206,7 +206,6 @@ class ConfoundersConfig:
     GRID_SIZE: int = 48
     CHANNEL: int = 1
     INPLACE: bool = True
-    NUM_INCLUDE_CLASSES: int = 48
 
 
 @dataclass
