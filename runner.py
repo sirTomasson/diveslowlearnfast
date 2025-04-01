@@ -46,7 +46,8 @@ def should_generate_masks(cfg: Config, epoch):
     if not cfg.EGL.ENABLED:
         return False
 
-    if not masks_exist(cfg):
+    # only generate masks once
+    if cfg.EGL.MASKS_PERIOD == -1 and not masks_exist(cfg):
         return True
 
     return cfg.EGL.MASKS_PERIOD != -1 and (epoch % cfg.EGL.MASKS_PERIOD) == 0
