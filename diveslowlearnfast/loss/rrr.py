@@ -85,7 +85,7 @@ class DualPathRRRLoss(nn.Module):
         self.skip_zero_masks = skip_zero_masks
         self.cross_entropy = nn.CrossEntropyLoss()
 
-    def forward(self, logits, targets, inputs, masks):
+    def forward(self, logits, targets, inputs, masks, warmup=False):
         ce_loss = self.cross_entropy(logits, targets)
         total_loss = ce_loss
         losses = {
@@ -93,7 +93,7 @@ class DualPathRRRLoss(nn.Module):
         }
 
         relevant_indices = _get_binary_index_mask(masks)
-        if self.skip_zero_masks and torch.sum(relevant_indices) == 0:
+        if warmup or (self.skip_zero_masks and torch.sum(relevant_indices) == 0):
             losses['total_loss'] = total_loss.item()
             for idx in range(len(inputs)):
                 losses[f'gradient_loss_path_{idx}'] = 0

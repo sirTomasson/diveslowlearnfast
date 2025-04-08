@@ -10,6 +10,7 @@ def superimpose_confounder(
         grid_size=48,
         channel=0,
         inplace=False,
+        binary=False
 ):
     """
 
@@ -43,8 +44,11 @@ def superimpose_confounder(
 
     # modify the `channel` at denormalised row and column
     # and set all other channels to zero
-    color_mask = torch.tensor([0, 0, 0])
-    color_mask[channel] = 1
-    x[:, :, tr:tr+size, tc:tc+size] = color_mask[:, None, None, None]
+    if binary:
+        x[:, :, tr:tr + size, tc:tc + size] = 1
+    else:
+        color_mask = torch.tensor([0, 0, 0])
+        color_mask[channel] = 1
+        x[:, :, tr:tr+size, tc:tc+size] = color_mask[:, None, None, None]
     return x
 

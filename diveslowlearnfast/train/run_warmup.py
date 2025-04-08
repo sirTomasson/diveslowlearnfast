@@ -36,7 +36,7 @@ def run_warmup(model, optimiser, criterion, dataloader, device, cfg: Config):
 
         logits = train_helper.forward(model, xb, device, cfg)
         if cfg.EGL.ENABLED:
-            loss, _ = criterion(logits, yb, xb, [masks_slow, masks_fast])
+            loss, _ = criterion(logits, yb, xb, [masks_slow, masks_fast], warmup=True)
         else:
             loss = criterion(logits, yb)
 

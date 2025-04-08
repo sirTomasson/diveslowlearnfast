@@ -46,6 +46,9 @@ def should_generate_masks(cfg: Config, epoch):
     if not cfg.EGL.ENABLED:
         return False
 
+    if cfg.EGL.ENABLED and cfg.EGL.METHOD == 'confounder':
+        return False
+
     # only generate masks once
     if cfg.EGL.MASKS_PERIOD == -1 and not masks_exist(cfg):
         return True

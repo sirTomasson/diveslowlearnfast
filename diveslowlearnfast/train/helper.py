@@ -179,6 +179,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
+            mask_type= 'confounder' if cfg.EGL.METHOD == 'confounder' else 'cache'
         )
     else:
         return_train_dataset = Diving48Dataset(

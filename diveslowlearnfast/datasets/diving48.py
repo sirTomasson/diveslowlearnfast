@@ -1,16 +1,17 @@
 import json
 import math
 import random
-
 import av
 import os
 import time
 import logging
+import torch
 
 import numpy as np
 
 from torch.utils.data import Dataset
 
+from diveslowlearnfast.datasets.superimpose_confounder import superimpose_confounder
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,15 @@ def extend_under_represented_classes(data):
     start = 0
     for count in counts:
         if count >= max_count:
-            new_data.extend(data[start:start+count])
+            new_data.extend(data[start:start + count])
             start += count
             continue
 
-        new_data.extend(data[start:start+count] * (max_count // count))
+        new_data.extend(data[start:start + count] * (max_count // count))
         start += count
 
     return new_data
+
 
 def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
                       use_sampling_ratio=False, **kwargs):
@@ -144,7 +146,8 @@ class Diving48Dataset(Dataset):
                  use_sampling_ratio=False,
                  video_ids=None,
                  masks_cache_dir=None,
-                 extend_classes=False):
+                 extend_classes=False,
+                 mask_type=None):
         super().__init__()
         assert dataset_type in ['train', 'test']
         self.videos_path = os.path.join(dataset_path, 'rgb')
@@ -165,6 +168,7 @@ class Diving48Dataset(Dataset):
         self.include_video_ids = video_ids
         self.masks_cache_dir = masks_cache_dir
         self.extend_classes = extend_classes
+        self.mask_type = mask_type
         self._init_dataset()
 
     def _init_dataset(self):
@@ -235,21 +239,34 @@ class Diving48Dataset(Dataset):
 
         return frames, io_time, transform_time
 
+    def _create_confounder_masks(self, label, size):
+        _, t, h, w = size
+        mask = torch.zeros((1, t, h, w), dtype=torch.bool)
+        mask = superimpose_confounder(mask, label, binary=True)
+        return mask[:, ::self.alpha], mask[:]
+
     def _read_mask(self, video_id, h, w):
         mask_slow_filename = os.path.join(self.masks_cache_dir, 'slow', f'{video_id}.npy')
         mask_fast_filename = os.path.join(self.masks_cache_dir, 'fast', f'{video_id}.npy')
         if os.path.exists(mask_slow_filename) and os.path.exists(mask_fast_filename):
             return np.load(mask_slow_filename), np.load(mask_fast_filename)
 
-        return np.zeros((1, self.num_frames // self.alpha, h, w), dtype=np.bool_), np.zeros((1, self.num_frames, h, w), dtype=np.bool_)
+        return np.zeros((1, self.num_frames // self.alpha, h, w), dtype=np.bool_), np.zeros((1, self.num_frames, h, w),
+                                                                                            dtype=np.bool_)
+
+    def _get_mask(self, label, video_id, size):
+        if self.mask_type == 'confounder':
+            return self._create_confounder_masks(label, size)
+        else:
+            _, _, h, w = size
+            return self._read_mask(video_id, h, w)
 
     def __getitem__(self, index):
         video_id = self.data[index]['vid_name']
         label = self.data[index]['label']
         frames, io_time, transform_time = self._read_frames(video_id)
-        if self.masks_cache_dir:
-            _, _, h, w = frames.shape
-            mask_slow, mask_fast = self._read_mask(video_id, h, w)
+        if self.mask_type is not None:
+            mask_slow, mask_fast = self._get_mask(label, video_id, frames.shape)
             return frames, label, io_time, transform_time, video_id, mask_slow, mask_fast
 
         return frames, label, io_time, transform_time, video_id, False, False
