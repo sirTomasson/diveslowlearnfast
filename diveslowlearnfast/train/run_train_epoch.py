@@ -27,9 +27,9 @@ def run_train_epoch(model: nn.Module,
     stats = Statistics()
     loader_iter = iter(loader)
     batch_bar = tqdm(range(len(loader)), desc='Train batch')
-    n_macro_batches = cfg.TRAIN.MACRO_BATCH_SIZE // cfg.TRAIN.BATCH_SIZE
-    n_macro_batches = n_macro_batches if n_macro_batches > 0 else 1
-    loss = 0
+    n_batches_per_step = cfg.TRAIN.MACRO_BATCH_SIZE // cfg.TRAIN.BATCH_SIZE
+    n_batches_per_step = n_batches_per_step if n_batches_per_step > 0 else 1
+    running_loss = 0.0
     correct = 0
     count = 0
     for i in batch_bar:
@@ -40,11 +40,12 @@ def run_train_epoch(model: nn.Module,
 
         yb = yb.to(device)
         o = train_helper.forward(model, xb, device, cfg, scaler)
-        current_loss = criterion(o, yb)
+        loss = criterion(o, yb)
 
-        loss += current_loss.item()
-        current_loss = current_loss / n_macro_batches
-        train_helper.backward(current_loss, scaler)
+        loss /= n_batches_per_step
+        train_helper.backward(loss, scaler)
+
+        running_loss += loss.item()
 
         with torch.no_grad():  # Add no_grad for prediction
             ypred = o.argmax(dim=-1).detach().cpu().numpy()
@@ -59,7 +60,7 @@ def run_train_epoch(model: nn.Module,
         count += len(xb)
 
         # if we have completed a sufficient number of macro batches, or it is the last batch
-        if (i+1) % n_macro_batches == 0 or (i+1) == len(loader):
+        if (i+1) % n_batches_per_step == 0 or (i+1) == len(loader):
             if scaler:
                 scaler.step(optimiser)
                 scaler.update()
@@ -68,11 +69,10 @@ def run_train_epoch(model: nn.Module,
             optimiser.zero_grad()
 
             acc = correct / count
-            loss /= n_macro_batches
-            stats.update(accuracy=acc, loss=loss)
+            stats.update(accuracy=acc, loss=running_loss)
             correct = 0
             count = 0
-            loss = 0
+            running_loss = 0
 
         stats_db.update(video_ids, ypred, ytrue, str(cfg.TRAIN.RESULT_DIR), 'train', epoch)
         stats.update(batch_time=(time.time() - start_time))
