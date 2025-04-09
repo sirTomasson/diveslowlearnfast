@@ -1,27 +1,62 @@
-import argparse
+import os
 import json
-from pathlib import Path
+import argparse
+import matplotlib
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from pathlib import Path
 
-def display(stats_path, which='losses', mode='train'):
-    assert which in ['accuracies', 'losses']
-    assert mode in ['test', 'train']
+def display(stats_path, which='loss', ext='png', save_dir=None, **kwargs):
+    assert which in ['accuracy', 'loss']
+    if ext == 'pgf':
+        matplotlib.use("pgf")
+        matplotlib.rcParams.update({
+            "pgf.texsystem": "pdflatex",
+            'font.family': 'serif',
+            'text.usetex': True,
+            'pgf.rcfonts': False,
+        })
+
     with open(stats_path, 'rb') as f:
         stats = json.load(f)
 
-    stat = stats[f'{mode}_{which}']
-    plt.plot(stat)
-    plt.title(f'{mode}_{which}')
-    plt.xlabel('iter')
-    plt.ylabel(which)
+    test_accuracies = stats['test_accuracies']
+    train_accuracies = stats['train_accuracies']
+
+    if len(test_accuracies) > 0:
+        x_old = np.arange(len(test_accuracies))
+        x_new = np.linspace(0, len(test_accuracies), len(train_accuracies))
+        test_accuracies = np.interp(x_new, x_old, test_accuracies)
+
+        plt.plot(test_accuracies, label='test')
+
+    plt.plot(train_accuracies, label='train')
+    plt.title(f'Train/Test {which.capitalize()}')
+    plt.xlabel('Epoch')
+    plt.ylabel(which.capitalize())
+    plt.legend()
     plt.grid()
-    plt.show()
+    if save_dir is not None and save_dir.exists():
+        filepath = os.path.join(save_dir, f'{stats_path}_{which}.{ext}')
+        plt.savefig(filepath)
+
+    if ext != 'pgf':
+        plt.show()
 
 
 def display_all(stats_path, **kwargs):
+    ext = kwargs['ext']
+    if ext == 'pgf':
+        matplotlib.use("pgf")
+        matplotlib.rcParams.update({
+            "pgf.texsystem": "pdflatex",
+            'font.family': 'serif',
+            'text.usetex': True,
+            'pgf.rcfonts': False,
+        })
+    save_dir = kwargs.get('save_dir')
     with open(stats_path, 'rb') as f:
         stats = json.load(f)
 
@@ -43,7 +78,12 @@ def display_all(stats_path, **kwargs):
     plt.ylabel('Loss')
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    if save_dir is not None and save_dir.exists():
+        filepath = os.path.join(save_dir, f'{stats_path}_loss.{ext}')
+        plt.savefig(filepath)
+
+    if ext != 'pgf':
+        plt.show()
 
     test_accuracies = stats['test_accuracies']
     train_accuracies = stats['train_accuracies']
@@ -63,7 +103,12 @@ def display_all(stats_path, **kwargs):
     plt.ylabel('Accuracy')
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    if save_dir is not None and save_dir.exists():
+        filepath = os.path.join(save_dir, f'{stats_path}_acc.{ext}')
+        plt.savefig(filepath)
+
+    if ext != 'pgf':
+        plt.show()
 
 
 def plot_confusion_matrix(confusion_matrix, save_path=None, labels=None, **_kwargs):
@@ -201,11 +246,26 @@ if __name__ == "__main__":
         help='Mode of stat to display options are: train, test',
         default='train'
     )
+
     parser.add_argument(
         '--all', '-A',
         type=bool,
         default=False,
         action='store'
+    )
+
+    parser.add_argument(
+        '--ext', '-X',
+        type=str,
+        default='png',
+        help='Extension of images to save'
+    )
+
+    parser.add_argument(
+        '--save_dir',
+        type=Path,
+        default=None,
+        help='Path to the save file'
     )
 
     args = vars(parser.parse_args())
