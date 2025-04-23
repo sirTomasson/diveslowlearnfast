@@ -40,9 +40,8 @@ def run_train_epoch(model: nn.Module,
 
         yb = yb.to(device)
         o = train_helper.forward(model, xb, device, cfg, scaler)
-        loss = criterion(o, yb)
+        loss = criterion(o, yb) / n_batches_per_step
 
-        loss /= n_batches_per_step
         train_helper.backward(loss, scaler)
 
         running_loss += loss.item()
@@ -64,8 +63,9 @@ def run_train_epoch(model: nn.Module,
             if scaler:
                 scaler.step(optimiser)
                 scaler.update()
+            else:
+                optimiser.step()
 
-            optimiser.step()
             optimiser.zero_grad()
 
             acc = correct / count
