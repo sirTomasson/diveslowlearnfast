@@ -26,3 +26,4 @@ from .train.helper import get_train_objects
 from .visualise.create_heatmap import create_heatmaps
 from .datasets.flow import flow2rgb, rgb2flow, read_flow, flow
 from .visualise.vidshow import vidshow
+from .datasets.utils import read_video_mp4, read_video_jpeg, read_diver_segmentation_mask, read_segmentation_mask, find_diver_mask
