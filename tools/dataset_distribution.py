@@ -1,11 +1,19 @@
 import json
 import os
+import matplotlib
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 def main():
-    dataset_path = '/home/s2871513/Datasets/Diving48/'
+    dataset_path = '/Users/youritomassen/Projects/xai/data/Diving48/'
+    matplotlib.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        'font.family': 'serif',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+    })
+
     train_labels = os.path.join(dataset_path, 'Diving48_V2_train.json')
     with open(train_labels, 'rb') as f:
         data = json.load(f)
@@ -39,10 +47,11 @@ def main():
 
     plt.margins(x=0)  # Remove horizontal padding
     plt.grid()
+    plt.title('Diving48 dataset distribution')
     plt.xlabel('class id')
     plt.ylabel('count')
     plt.legend()
-    plt.savefig('../results/diving48_distribution.png')
+    plt.savefig('../results/diving48_distribution.pgf')
     plt.show()
 
 
