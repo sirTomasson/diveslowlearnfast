@@ -12,7 +12,7 @@ from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
-from diveslowlearnfast.loss.rrr import DualPathRRRLoss
+from diveslowlearnfast.loss.rrr import DualPathRRRLoss, DualPathRRRLossV2
 from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
 
@@ -232,7 +232,11 @@ def get_train_objects(cfg: Config, model, device: torch.device = torch.device('c
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
     if cfg.EGL.ENABLED:
-        criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
+        assert cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']
+        if cfg.EGL.LOSS_FUNC == 'rrr':
+            criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
+        else:
+            criterion = DualPathRRRLossV2(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
     else:
         if cfg.MODEL.CLASS_WEIGHTS:
             weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)

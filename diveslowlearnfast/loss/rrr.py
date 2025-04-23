@@ -69,7 +69,6 @@ def _normalise_gradients(gradients):
 
 class DualPathRRRLoss(nn.Module):
 
-
     def __init__(self,
                  lambdas=None,
                  normalise_gradients=False,
@@ -127,6 +126,79 @@ class DualPathRRRLoss(nn.Module):
 
         logger.debug('Gradients exist on "inp", reusing existing gradients')
         return inp.grad
+
+
+class DualPathRRRLossV2(nn.Module):
+    def __init__(self,
+                 lambdas=None,
+                 normalise_gradients=False,
+                 skip_zero_masks=False):
+        super().__init__()
+
+        if lambdas is None:
+            lambdas = [1000.0, 1000.0]
+
+        self.lambdas = lambdas
+        self.normalise_gradients = normalise_gradients
+        self.skip_zero_masks = skip_zero_masks
+
+    def forward(self, logits, targets, inputs, masks, warmup=False):
+        batch_size = logits.size(0)
+
+        # Convert targets to one-hot encoding for proper calculation
+        num_classes = logits.size(1)
+        target_one_hot = torch.zeros_like(logits).scatter_(1, targets.unsqueeze(1), 1)
+
+        # Calculate the log probabilities
+        log_probs = F.log_softmax(logits, dim=1)
+
+        # Calculate cross-entropy loss (right answer loss)
+        # This matches tf.reduce_sum(tf.multiply(self.y, -self.log_prob_ys))
+        right_answer_loss = -torch.sum(target_one_hot * log_probs) / batch_size
+
+        total_loss = right_answer_loss
+        losses = {'ce_loss': right_answer_loss.item()}
+
+        if warmup or (self.skip_zero_masks and all(torch.sum(mask) == 0 for mask in masks)):
+            losses['total_loss'] = total_loss.item()
+            for idx in range(len(inputs)):
+                losses[f'gradient_loss_path_{idx}'] = 0
+            return total_loss, losses
+
+        # Calculate gradient penalties for each input path
+        for idx, (inp, mask) in enumerate(zip(inputs, masks)):
+            if torch.sum(mask) == 0 and self.skip_zero_masks:
+                losses[f'gradient_loss_path_{idx}'] = 0
+                continue
+
+            # Calculate gradients of log_probs with respect to input
+            # This matches tf.gradients(self.log_prob_ys, self.X)[0]
+            gradients = torch.autograd.grad(
+                log_probs,
+                inp,
+                grad_outputs=torch.ones_like(log_probs),
+                create_graph=True,
+                retain_graph=True
+            )[0]
+
+            if self.normalise_gradients:
+                gradients = gradients / (torch.norm(gradients, dim=1, keepdim=True) + 1e-10)
+
+            # Apply mask to gradients (A_gradX = tf.multiply(self.A, gradXes))
+            masked_gradients = mask * gradients
+
+            # L2 gradient penalty (l2_grads * tf.nn.l2_loss(A_gradX))
+            n_frames = inp.size(2)
+            l2_grad_loss = self.lambdas[idx] * torch.sum(masked_gradients**2) / (batch_size * n_frames)
+
+
+            gradient_loss = l2_grad_loss
+            total_loss += gradient_loss
+
+            losses[f'gradient_loss_path_{idx}'] = gradient_loss.item()
+
+        losses['total_loss'] = total_loss.item()
+        return total_loss, losses
 
 
 def _get_binary_index_mask(masks):
