@@ -21,7 +21,6 @@ def read_video_jpeg(path):
         video.append(np.array(img))
     return np.stack(video)
 
-
 def read_video_mp4(path, multithread_decode=True):
     frames = []
     container = av.open(path)

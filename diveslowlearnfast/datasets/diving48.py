@@ -12,6 +12,8 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from diveslowlearnfast.datasets.superimpose_confounder import superimpose_confounder
+from PIL import Image
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,19 +59,20 @@ def pad_video(video, size):
     return np.concatenate((video, np.zeros((padding_size, *video.shape[1:]))))
 
 
-def wrap_around(offset_indices, total_frames):
+def wrap_around(offset_indices, total_frames, min=0):
     result = []
     for idx in offset_indices:
         if idx > total_frames:
             diff = abs(offset_indices[-1] - offset_indices[-2])
-            result.insert(0, result[0] - diff)
+            result.insert(min, result[0] - diff)
         else:
             result.append(idx)
 
-    return np.clip(result, 0, total_frames)
+    return np.clip(result, min, total_frames)
 
 
-def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_sampling_ratio=False):
+def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_sampling_ratio=False,
+                                   should_wrap_around=True):
     if temporal_random_offset == 0 and not use_sampling_ratio:
         return indices
 
@@ -81,8 +84,11 @@ def temporal_random_offset_indices(indices, total_frames, temporal_random_offset
         logger.debug(
             f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
 
-    offset_indices = math.floor(random.uniform(0, temporal_random_offset)) + indices
-    return wrap_around(offset_indices, total_frames)
+    offset_indices = math.floor(random.uniform(min(indices), temporal_random_offset)) + indices
+    if should_wrap_around:
+        offset_indices = wrap_around(offset_indices, total_frames, min(indices))
+
+    return offset_indices
 
 
 def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter=0):
@@ -120,10 +126,58 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
     container.close()
     return np.stack(frames)
 
+def read_video_from_image_indices(path, indices, format='jpg'):
+    assert format in ['jpg', 'png']
+    video = []
+    for idx in indices:
+        image_path = f'{path}/{idx:04d}.{format}'
+        if not os.path.exists(image_path):
+            if len(video) == 0:
+                raise Exception(f'Empty sequence for {image_path}.')
+            # If the image does not exist we got an indice beyond the last image in the sequence, so we should insert
+            # a black frame
+            video.append(np.zeros(video[-1].shape))
+            continue
+
+        img = Image.open(image_path)
+        video.append(np.array(img))
+
+    return np.stack(video)
+
+def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
+                            use_sampling_ratio=False, **kwargs):
+    """Efficiently load video frames using uniform sampling"""
+    total_frames = len(os.listdir(video_path))
+
+    indices = np.linspace(1, total_frames, num_frames, dtype=np.int32)
+    indices = temporal_random_offset_indices(indices, total_frames, temporal_random_offset, use_sampling_ratio, should_wrap_around=False)
+    indices = temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter)
+    return read_video_from_image_indices(video_path, indices, 'jpg')
+
 
 def collate_fn(batch):
     max_frames = max(video.shape[0] for video in batch)
     return [pad_video(video, max_frames) for video in batch]
+
+
+def get_video_loader(use_decord, loader_mode):
+    if loader_mode == 'mp4':
+        if use_decord:
+            return decord_load_video
+        else:
+            return load_video_av_optimized
+    elif loader_mode == 'jpg':
+        return load_video_from_images
+    else:
+        raise ValueError(f'Unknown loader mode: {loader_mode}')
+
+
+def get_videos_dir(loader_mode):
+    if loader_mode == 'mp4':
+        return 'rgb'
+    elif loader_mode == 'jpg':
+        return 'JPEGImages'
+    raise ValueError(f'Unknown loader mode: {loader_mode}')
 
 
 class Diving48Dataset(Dataset):
@@ -140,6 +194,7 @@ class Diving48Dataset(Dataset):
                  target_fps=None,
                  use_decord=False,
                  multi_thread_decode=False,
+                 loader_mode='mp4',
                  threshold=-1,
                  seed=42,
                  include_labels=None,
@@ -147,10 +202,12 @@ class Diving48Dataset(Dataset):
                  video_ids=None,
                  masks_cache_dir=None,
                  extend_classes=False,
-                 mask_type=None):
+                 mask_type=None,
+                 should_wrap_around=True):
         super().__init__()
+        assert loader_mode in ['mp4', 'jpg']
         assert dataset_type in ['train', 'test']
-        self.videos_path = os.path.join(dataset_path, 'rgb')
+        self.videos_path = os.path.join(dataset_path, get_videos_dir(loader_mode))
         self.annotations_path = os.path.join(dataset_path, f'Diving48_{dataset_version}_{dataset_type}.json')
         self.vocab_path = os.path.join(dataset_path, f'Diving48_vocab.json')
         self.num_frames = num_frames
@@ -159,7 +216,8 @@ class Diving48Dataset(Dataset):
         self.transform_fn = transform_fn
         self.temporal_random_jitter = temporal_random_jitter
         self.temporal_random_offset = temporal_random_offset
-        self.load_video = decord_load_video if use_decord else load_video_av_optimized
+        self.load_video = get_video_loader(use_decord, loader_mode)
+        self.loader_mode = loader_mode
         self.multi_thread_decode = multi_thread_decode
         self.threshold = threshold
         self.seed = seed
@@ -169,6 +227,7 @@ class Diving48Dataset(Dataset):
         self.masks_cache_dir = masks_cache_dir
         self.extend_classes = extend_classes
         self.mask_type = mask_type
+        self.should_wrap_around = should_wrap_around
         self._init_dataset()
 
     def _init_dataset(self):
@@ -220,7 +279,8 @@ class Diving48Dataset(Dataset):
 
     def _read_frames(self, video_id):
         start = time.time()
-        video_path = os.path.join(self.videos_path, f'{video_id}.mp4')
+        filename = f'{video_id}.mp4' if self.loader_mode == 'mp4' else video_id
+        video_path = os.path.join(self.videos_path, filename)
 
         frames = self.load_video(video_path,
                                  self.num_frames,
