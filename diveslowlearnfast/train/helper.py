@@ -2,7 +2,6 @@ from typing import Iterator
 
 import pytorchvideo
 import torch
-import random
 
 from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize
 from torch import autocast
@@ -14,7 +13,8 @@ from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
 from diveslowlearnfast.loss.rrr import DualPathRRRLoss, DualPathRRRLossV2
 from diveslowlearnfast.train.stats import Statistics
-from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo
+from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo, KwargsCompose, CutoutSegment, \
+    RandomApply
 
 
 def get_batch(loader: Iterator,
@@ -37,80 +37,106 @@ def get_batch(loader: Iterator,
     return xb, yb.to(device), video_ids, masks_slow.to(device), masks_fast.to(device)
 
 
-def get_aug_paras(cfg: Config):
-    if not cfg.RAND_AUGMENT.ENABLED:
-        return None
+def get_randaug_transform(cfg: Config, crop_size, p=.5):
+    return KwargsCompose([
+        ToTensor4D(dtype=torch.uint8),
+        Div255(),
+        RandomShortSideScale(
+            min_size=256,
+            max_size=320,
+        ),
+        RandomCrop(crop_size),
+        Permute(1, 0, 2, 3),
+        pytorchvideo.transforms.rand_augment.RandAugment(
+            num_layers=cfg.RAND_AUGMENT.NUM_LAYERS,
+            magnitude=cfg.RAND_AUGMENT.MAGNITUDE,
+            prob=p,
+        ),
+        Permute(1, 0, 2, 3),
+        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+        RandomHorizontalFlip(p=0.5),
+    ])
 
-    return {
-        'num_layers': cfg.RAND_AUGMENT.NUM_LAYERS,
-        'magnitude': cfg.RAND_AUGMENT.MAGNITUDE,
-        'prob': cfg.RAND_AUGMENT.PROB,
-    }
 
-
-def get_aug_type(cfg: Config):
-    if cfg.RAND_AUGMENT.ENABLED:
-        return 'randaug'
-
-    return 'default'
-
-
-def get_train_transform(cfg: Config, crop_size=None):
-    crop_size = cfg.DATA.TRAIN_CROP_SIZE if crop_size is None else crop_size
-
-    transformations = [
+def get_rotate_transform(cfg: Config, crop_size):
+    angle = cfg.RANDOM_ROTATE.MAX_DEGREE
+    return KwargsCompose([
         ToTensor4D(),
+        Div255(),
+        RandomShortSideScale(
+            min_size=256,
+            max_size=320,
+        ),
+        RandomCrop(crop_size),
+        Permute(1, 0, 2, 3),  # From 3 x T x H X W -> T x 3 x H x W
+        RandomRotateVideo(-angle, angle),
+        Permute(1, 0, 2, 3),  # From T x 3 x H X W -> 3 x T x H x W
+        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+        RandomHorizontalFlip(p=0.5),
+    ])
+
+
+def get_cutout_segment_transform(cfg: Config, crop_size, p=.5):
+    return KwargsCompose([
+        ToTensor4D(),
+        Permute(1, 2, 3, 0),  # From 3 x T x H x W -> T x H X W x 3
+        CutoutSegment(dataset_path=cfg.CUTOUT_SEGMENT.SEGMENTS_PATH, p=p),
         Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
         Div255(),
         RandomShortSideScale(
             min_size=256,
             max_size=320,
         ),
-        RandomCrop(cfg.DATA.TRAIN_CROP_SIZE),
-    ]
+        RandomCrop(crop_size),
+        RandomHorizontalFlip(p=0.5),
+        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+    ])
 
-    aug_type = get_aug_type(cfg)
-    if aug_type == 'randaug':
-        transformations.append(
-            pytorchvideo.transforms.create_video_transform(
-                mode='train',
-                num_samples=cfg.DATA.NUM_FRAMES,
-                video_std=cfg.DATA.MEAN,
-                video_mean=cfg.DATA.STD,
-                convert_to_float=False,
-                crop_size=crop_size,
-                aug_type=get_aug_type(cfg),
-                aug_paras=get_aug_paras(cfg),
-                horizontal_flip_prob=0.5,
-            )
-        )
+
+def get_base_transform(cfg, crop_size):
+    return KwargsCompose([
+        ToTensor4D(),
+        Div255(),
+        RandomShortSideScale(
+            min_size=256,
+            max_size=320,
+        ),
+        RandomCrop(crop_size),
+        Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
+        RandomHorizontalFlip(p=0.5),
+    ])
+
+
+def get_train_transform(cfg: Config, crop_size=None):
+    crop_size = cfg.DATA.TRAIN_CROP_SIZE if crop_size is None else crop_size
+    if cfg.RANDOM_APPLY_TRANSFORM.ENABLED:
+        transformations = list(filter(lambda x: x is not None, [
+            get_randaug_transform(cfg, crop_size, p=1.0) if cfg.RAND_AUGMENT.ENABLED else None,
+            get_rotate_transform(cfg, crop_size) if cfg.RANDOM_ROTATE.ENABLED else None,
+            get_cutout_segment_transform(cfg, crop_size, p=1.0) if cfg.CUTOUT_SEGMENT.ENABLED else None,
+            get_base_transform(cfg, crop_size)
+        ]))
+        assert len(transformations) > 0, 'At least one transform must be enabled'
+        return RandomApply(transformations, p=cfg.RANDOM_APPLY_TRANSFORM.PROB)
+    elif cfg.RAND_AUGMENT.ENABLED:
+        return get_randaug_transform(cfg, crop_size, p=cfg.RAND_AUGMENT.PROB)
+    elif cfg.RANDOM_ROTATE.ENABLED:
+        return get_rotate_transform(cfg, crop_size)
+    elif cfg.CUTOUT_SEGMENT.ENABLED:
+        return get_cutout_segment_transform(cfg, crop_size)
     else:
-        transformations.extend([
-            RandomCrop(cfg.DATA.TRAIN_CROP_SIZE),
-            Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
-            RandomHorizontalFlip(p=0.5),
-        ])
-
-    if cfg.RANDOM_ROTATE.ENABLED:
-        angle = cfg.RANDOM_ROTATE.MAX_DEGREE
-        transformations.extend([
-            Permute(1, 0, 2, 3),  # From 3 x T x H X W -> T x 3 x H x W; because RandAug expects this shape
-            RandomRotateVideo(-angle, angle),
-            Permute(1, 0, 2, 3),  # From T x 3 x H X W -> 3 x T x H x W
-        ])
-    return Compose(transformations)
+        return get_base_transform(cfg, crop_size)
 
 
 def get_test_transform(cfg: Config):
-    return Compose([
+    return KwargsCompose([
         ToTensor4D(),
-        Permute(3, 0, 1, 2),
         Div255(),
         pytorchvideo.transforms.create_video_transform(
             mode='test',
             num_samples=cfg.DATA.NUM_FRAMES,
-            video_std=cfg.DATA.MEAN,
-            video_mean=cfg.DATA.STD,
+            video_std=cfg.DATA.STD,
+            video_mean=cfg.DATA.MEAN,
             convert_to_float=False,
             crop_size=cfg.DATA.TEST_CROP_SIZE,
         ),
@@ -179,7 +205,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
-            mask_type= 'confounder' if cfg.EGL.METHOD == 'confounder' else 'cache'
+            mask_type='confounder' if cfg.EGL.METHOD == 'confounder' else 'cache'
         )
     else:
         return_train_dataset = Diving48Dataset(

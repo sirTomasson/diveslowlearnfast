@@ -42,6 +42,18 @@ class RandomRotateConfig:
 
 
 @dataclass
+class CutoutSegmentConfig:
+    ENABLED: bool = False
+    SEGMENTS_PATH: str = ''
+
+
+@dataclass
+class RandomApplyTransformConfig:
+    ENABLED: bool = False
+    PROB: float = 0.5
+
+
+@dataclass
 class SlowFastConfig:
     ALPHA: int = 8
     BETA_INV: int = 8
@@ -224,6 +236,8 @@ class Config:
     DATA_LOADER: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     RAND_AUGMENT: RandAugmentConfig = field(default_factory=RandAugmentConfig)
     RANDOM_ROTATE: RandomRotateConfig = field(default_factory=RandomRotateConfig)
+    CUTOUT_SEGMENT: CutoutSegmentConfig = field(default_factory=CutoutSegmentConfig)
+    RANDOM_APPLY_TRANSFORM: RandomApplyTransformConfig = field(default_factory=RandomApplyTransformConfig)
     EVAL: EvalConfig = field(default_factory=EvalConfig)
     EGL: EGLConfig = field(default_factory=EGLConfig)
     GRADCAM: GradCAMConfig = field(default_factory=GradCAMConfig)

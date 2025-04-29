@@ -9,4 +9,4 @@ class ToTensor4D(Transform):
         self.dtype = dtype if dtype is not None else torch.float32
 
     def __call__(self, x):
-        return torch.tensor(x, dtype=self.dtype)
+        return torch.tensor(x, dtype=self.dtype).permute(3, 0, 1, 2)

@@ -12,8 +12,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from diveslowlearnfast.datasets.superimpose_confounder import superimpose_confounder
-from PIL import Image
-
+from diveslowlearnfast.datasets.utils import read_video_from_image_indices
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
     indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
     indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
     frames = vr.get_batch(indices)
-    return frames.asnumpy()
+    return frames.asnumpy(), indices
 
 
 def pad_video(video, size):
@@ -124,25 +123,7 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
             frames.extend(counts * [frame.to_ndarray(format='rgb24')])
 
     container.close()
-    return np.stack(frames)
-
-def read_video_from_image_indices(path, indices, format='jpg'):
-    assert format in ['jpg', 'png']
-    video = []
-    for idx in indices:
-        image_path = f'{path}/{idx:04d}.{format}'
-        if not os.path.exists(image_path):
-            if len(video) == 0:
-                raise Exception(f'Empty sequence for {image_path}.')
-            # If the image does not exist we got an indice beyond the last image in the sequence, so we should insert
-            # a black frame
-            video.append(np.zeros(video[-1].shape))
-            continue
-
-        img = Image.open(image_path)
-        video.append(np.array(img))
-
-    return np.stack(video)
+    return np.stack(frames), indices
 
 
 def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
@@ -154,7 +135,7 @@ def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, tem
     indices = temporal_random_offset_indices(indices, total_frames, temporal_random_offset, use_sampling_ratio,
                                              should_wrap_around=False)
     indices = temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter)
-    return read_video_from_image_indices(video_path, indices, 'jpg')
+    return read_video_from_image_indices(video_path, indices, 'jpg'), indices
 
 
 def collate_fn(batch):
@@ -284,19 +265,19 @@ class Diving48Dataset(Dataset):
         filename = f'{video_id}.mp4' if self.loader_mode == 'mp4' else video_id
         video_path = os.path.join(self.videos_path, filename)
 
-        frames = self.load_video(video_path,
-                                 self.num_frames,
-                                 self.temporal_random_jitter,
-                                 self.temporal_random_offset,
-                                 multithread_decode=self.multi_thread_decode,
-                                 use_sampling_ratio=self.use_sampling_ratio)
+        frames, indices = self.load_video(video_path,
+                                          self.num_frames,
+                                          self.temporal_random_jitter,
+                                          self.temporal_random_offset,
+                                          multithread_decode=self.multi_thread_decode,
+                                          use_sampling_ratio=self.use_sampling_ratio)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:
             frames = pad_video(frames, self.num_frames)
 
         start = time.time()
-        frames = self._transform(frames)
+        frames = self._transform(frames, video_id, indices)
         transform_time = time.time() - start
 
         return frames, io_time, transform_time
@@ -354,9 +335,9 @@ class Diving48Dataset(Dataset):
     def get_label(self, idx):
         return self.vocab[idx]
 
-    def _transform(self, frames):
+    def _transform(self, frames, video_id, indices):
         if self.transform_fn:
-            frames = self.transform_fn(frames)
+            frames = self.transform_fn(frames, vidname=video_id, indices=indices)
 
         return frames
 

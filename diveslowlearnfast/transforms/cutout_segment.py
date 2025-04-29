@@ -12,11 +12,11 @@ class CutoutSegment(Transform):
         self.accepts_kwargs = True
         self.p = p
 
-    def __call__(self, x, vidname=None):
+    def __call__(self, x, vidname=None, indices=None):
         assert vidname is not None
         path = os.path.join(self.dataset_path, vidname)
-        masks = read_diver_segmentation_mask(path)
-        if random.random() < self.p:
+        masks = read_diver_segmentation_mask(path, indices=indices)
+        if random.random() > self.p:
             return x
 
         return x * masks[:, :, :, None]

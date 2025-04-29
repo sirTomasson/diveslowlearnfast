@@ -4,7 +4,8 @@ __all__ = [
     'ToTensor4D',
     'RandomRotateVideo',
     'CutoutSegment',
-    'KwargsCompose'
+    'KwargsCompose',
+    'RandomApply'
 ]
 
 from .permute import Permute
@@ -13,3 +14,4 @@ from .to_tensor4d import ToTensor4D
 from .random_rotate_video import RandomRotateVideo
 from .cutout_segment import CutoutSegment
 from .kwargs_compose import KwargsCompose
+from .random_apply import RandomApply

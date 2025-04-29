@@ -21,6 +21,25 @@ def read_video_jpeg(path):
         video.append(np.array(img))
     return np.stack(video)
 
+
+def read_video_from_image_indices(path, indices, format='jpg'):
+    assert format in ['jpg', 'png']
+    video = []
+    for idx in indices:
+        image_path = f'{path}/{idx:04d}.{format}'
+        if not os.path.exists(image_path):
+            if len(video) == 0:
+                raise Exception(f'Empty sequence for {image_path}.')
+            # If the image does not exist we got an indice beyond the last image in the sequence, so we should insert
+            # a black frame
+            video.append(np.zeros(video[-1].shape))
+            continue
+
+        img = Image.open(image_path)
+        video.append(np.array(img))
+
+    return np.stack(video)
+
 def read_video_mp4(path, multithread_decode=True):
     frames = []
     container = av.open(path)
@@ -36,8 +55,12 @@ def read_segmentation_mask(path):
     return read_video_jpeg(path)
 
 
-def read_diver_segmentation_mask(path):
-    masks = read_segmentation_mask(path)
+def read_diver_segmentation_mask(path, indices=None):
+    if indices is None:
+        masks = read_segmentation_mask(path)
+    else:
+        masks = read_video_from_image_indices(path, indices, 'png')
+
     return np.stack([find_diver_mask(mask) for mask in masks])
 
 
