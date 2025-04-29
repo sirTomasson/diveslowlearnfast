@@ -144,13 +144,15 @@ def read_video_from_image_indices(path, indices, format='jpg'):
 
     return np.stack(video)
 
+
 def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
-                            use_sampling_ratio=False, **kwargs):
+                           use_sampling_ratio=False, **kwargs):
     """Efficiently load video frames using uniform sampling"""
     total_frames = len(os.listdir(video_path))
 
     indices = np.linspace(1, total_frames, num_frames, dtype=np.int32)
-    indices = temporal_random_offset_indices(indices, total_frames, temporal_random_offset, use_sampling_ratio, should_wrap_around=False)
+    indices = temporal_random_offset_indices(indices, total_frames, temporal_random_offset, use_sampling_ratio,
+                                             should_wrap_around=False)
     indices = temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter)
     return read_video_from_image_indices(video_path, indices, 'jpg')
 

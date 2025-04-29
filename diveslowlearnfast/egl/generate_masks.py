@@ -52,3 +52,17 @@ def generate_masks(loader, explainer, cfg: Config, device: torch.device=torch.de
         localisation_maps, _logits = explainer(inputs, yb)
         masks = [_generate_masks(localisation_map, invert=cfg.EGL.INVERT_MASKS, percentile=cfg.EGL.MASK_PERCENTILE) for localisation_map in localisation_maps]
         _save_masks(masks, video_ids, masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR)
+
+
+def generate_masks_from_localisation_maps(localisation_maps, cfg: Config, indices):
+    masks = []
+    for localisation_map in localisation_maps:
+        mask = np.zeros_like(localisation_map)
+        if torch.all(indices == False):
+            masks.append(mask)
+            continue
+        localisation_map = localisation_map[indices]
+        mask[indices] = _generate_masks(localisation_map, invert=cfg.EGL.INVERT_MASKS, percentile=cfg.EGL.MASK_PERCENTILE)
+        masks.append(mask)
+
+    return masks

@@ -1,11 +1,9 @@
-
 import torch
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from typing import Union
-
 
 
 def frameshow(tensor_or_ndarray: Union[torch.Tensor, np.ndarray], frame_idx=0, axis='off', title=None, permute=None):

@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
+from diveslowlearnfast.egl.generate_masks import generate_masks_from_localisation_maps
 from diveslowlearnfast.loss.rrr import RRRLoss, DualPathRRRLoss
 from diveslowlearnfast.models.utils import to_slowfast_inputs
 from diveslowlearnfast.train import StatsDB
@@ -49,6 +50,15 @@ def add_losses_entry(stats_db: StatsDB, losses, epoch, cfg: Config):
     stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
 
 
+def get_masks(y_pred, y_true, localisation_maps, cfg, device):
+    if cfg.EGL.METHOD == 'confounder':
+        return localisation_maps
+
+    # Otherwise it the EGL.METHOD == 'gradcam'
+    generate_masks_indices = (y_pred != y_true).detach().cpu().numpy()
+    masks = generate_masks_from_localisation_maps(localisation_maps, cfg, generate_masks_indices)
+    return [torch.from_numpy(masks_slow_and_fast).to(device) for masks_slow_and_fast in masks]
+
 def run_train_epoch(model: nn.Module,
                     rrr_loss: RRRLoss | DualPathRRRLoss,
                     optimiser: torch.optim.Optimizer,
@@ -68,7 +78,7 @@ def run_train_epoch(model: nn.Module,
     running_loss = 0.0
     for i in batch_bar:
         with stats.timer('batch_time'):
-            xb, yb, video_ids, masks_slow, masks_fast = train_helper.get_batch(
+            xb, yb, video_ids, *_ = train_helper.get_batch(
                 loader_iter,
                 device,
                 stats
@@ -81,15 +91,19 @@ def run_train_epoch(model: nn.Module,
                 device=device
             )
 
-            logits = model(inputs)
-            loss, losses = rrr_loss(logits, yb, inputs, [masks_slow, masks_fast])
+            # 'model' is actually an explainer
+            localisation_maps, logits = model(inputs)
+            y_pred = torch.softmax(logits, dim=-1).argmax(dim=-1)
+
+            masks_slow_and_fast = get_masks(y_pred, yb, localisation_maps, cfg, device)
+            loss, losses = rrr_loss(logits, yb, inputs, masks_slow_and_fast)
             add_losses_entry(stats_db, losses, epoch, cfg)
             loss /= n_batches_per_step # scale loss by the number of batches in a step
             train_helper.backward(loss)
 
             running_loss += loss.item()
 
-            Y_pred.extend(logits.argmax(dim=-1).detach().cpu().tolist())
+            Y_pred.extend(y_pred.detach().cpu().tolist())
             Y_true.extend(yb.detach().cpu().tolist())
             V_ids.extend(video_ids)
 

@@ -49,7 +49,7 @@ class ExplainerStrategy:
 
                     result.append(torch.stack(sub_result))
 
-                return result, None
+                return result, model(inputs)
 
             return _confounder_explainer
 

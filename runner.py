@@ -15,7 +15,7 @@ from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, loa
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import StatsDB
 
-from diveslowlearnfast.egl import run_egl_train_epoch, egl_helper
+from diveslowlearnfast.egl import run_egl_train_epoch, egl_helper, ExplainerStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +183,6 @@ def main():
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
     for epoch in epoch_bar:
-        if should_generate_masks(cfg, epoch):
-            generate_masks(stats_db, start_epoch, cfg, model, device)
-
         # if the threshold is set and the seed is None we want to reload the dataset and loader at each epoch
         # this will ensure a new sample from the dataset with the threshold is drawn so the model will see a higher
         # variety of data.
@@ -195,6 +192,8 @@ def main():
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
         if cfg.EGL.ENABLED:
+            # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
+            model = ExplainerStrategy.get_explainer(model, cfg, device)
             train_acc, train_loss = run_egl_train_epoch(
                 model,
                 criterion,
