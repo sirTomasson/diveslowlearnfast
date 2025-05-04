@@ -15,7 +15,7 @@ from diveslowlearnfast.train import run_train_epoch, run_warmup, save_stats, loa
 from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import StatsDB
 
-from diveslowlearnfast.egl import run_egl_train_epoch, egl_helper, ExplainerStrategy
+from diveslowlearnfast.egl import run_egl_train_epoch, egl_helper, ExplainerStrategy, GradCamExplainer
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,9 @@ def main():
 
         if cfg.EGL.ENABLED:
             # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
-            model = ExplainerStrategy.get_explainer(model, cfg, device)
+            if type(model) is not GradCamExplainer:
+                model = ExplainerStrategy.get_explainer(model, cfg, device)
+
             train_acc, train_loss = run_egl_train_epoch(
                 model,
                 criterion,
@@ -222,7 +224,10 @@ def main():
         epoch_bar.set_postfix({'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}'})
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
-            save_checkpoint(model, optimiser, epoch, cfg)
+            if type(model) is not GradCamExplainer:
+                save_checkpoint(model.gradcam.model, optimiser, epoch, cfg)
+            else:
+                save_checkpoint(model, optimiser, epoch, cfg)
 
         stats['train_losses'].append(float(train_loss))
         stats['train_accuracies'].append(float(train_acc))

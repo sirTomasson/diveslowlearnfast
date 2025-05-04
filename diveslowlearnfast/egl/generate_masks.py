@@ -9,10 +9,9 @@ from diveslowlearnfast.models.utils import to_slowfast_inputs
 
 
 def _generate_masks(exp, percentile=50, invert=False):
-    features = exp.detach().cpu().numpy()
-    thresh = np.percentile(features, percentile, axis=(1, 2, 3, 4))
+    thresh = np.percentile(exp, percentile, axis=(1, 2, 3, 4))
     thresh = thresh.reshape((-1, 1, 1, 1, 1))
-    mask = features > thresh
+    mask = exp > thresh
     if invert:
         mask = ~mask
     return mask
@@ -57,6 +56,7 @@ def generate_masks(loader, explainer, cfg: Config, device: torch.device=torch.de
 def generate_masks_from_localisation_maps(localisation_maps, cfg: Config, indices=None):
     masks = []
     for localisation_map in localisation_maps:
+        localisation_map = localisation_map.detach().cpu().numpy()
         mask = np.zeros_like(localisation_map)
         if indices is None:
             indices = np.ones(localisation_map.shape[0], dtype=np.bool_)

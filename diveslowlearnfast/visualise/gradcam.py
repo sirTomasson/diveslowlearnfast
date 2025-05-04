@@ -21,8 +21,6 @@ def get_layer(model, layer_name):
     return prev_module
 
 
-
-
 class GradCAM:
     """
     GradCAM class helps create localization maps using the Grad-CAM method for input videos
@@ -61,15 +59,11 @@ class GradCAM:
             layer_name (str): name of the layer.
         """
 
-        def get_gradients(_module, _grad_input, grad_output):
-            self.gradients[layer_name] = grad_output[0].detach()
-
         def get_activations(_module, _input, output):
-            self.activations[layer_name] = output.clone().detach()
+            self.activations[layer_name] = output
 
         target_layer = get_layer(self.model, layer_name=layer_name)
         target_layer.register_forward_hook(get_activations)
-        target_layer.register_full_backward_hook(get_gradients)
 
     def _register_hooks(self):
         """
@@ -90,10 +84,9 @@ class GradCAM:
             preds (tensor): shape (n_instances, n_class). Model predictions for `inputs`.
         """
         assert (
-            len(inputs) == len(self.target_layers)
+                len(inputs) == len(self.target_layers)
         ), "Must register the same number of target layers as the number of input pathways."
-        input_clone = [inp.clone() for inp in inputs]
-        preds = self.model(input_clone)
+        preds = self.model(inputs)
 
         if labels is None:
             score = torch.max(preds, dim=-1)[0]
@@ -102,15 +95,16 @@ class GradCAM:
                 labels = labels.unsqueeze(-1)
             score = torch.gather(preds, dim=1, index=labels)
 
-        self.model.zero_grad()
         score = torch.sum(score)
-        score.backward()
         localization_maps = []
         for i, inp in enumerate(inputs):
             _, _, T, H, W = inp.size()
 
-            gradients = self.gradients[self.target_layers[i]]
             activations = self.activations[self.target_layers[i]]
+            gradients = torch.autograd.grad(score,
+                                            activations,
+                                            create_graph=True,
+                                            retain_graph=True)[0]
             B, C, Tg, _, _ = gradients.size()
 
             weights = torch.mean(gradients.view(B, C, Tg, -1), dim=3)
@@ -136,7 +130,7 @@ class GradCAM:
             )
             # Normalize the localization map.
             localization_map = (localization_map - localization_map_min) / (
-                localization_map_max - localization_map_min + 1e-6
+                    localization_map_max - localization_map_min + 1e-6
             )
             localization_map = localization_map.data
 
