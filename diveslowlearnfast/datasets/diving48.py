@@ -11,8 +11,10 @@ import numpy as np
 
 from torch.utils.data import Dataset
 
+from .utils import read_diver_segmentation_mask
 from diveslowlearnfast.datasets.superimpose_confounder import superimpose_confounder
 from diveslowlearnfast.datasets.utils import read_video_from_image_indices
+from ..transforms import get_deterministic_transform_params
 
 logger = logging.getLogger(__name__)
 
@@ -186,10 +188,13 @@ class Diving48Dataset(Dataset):
                  masks_cache_dir=None,
                  extend_classes=False,
                  mask_type=None,
-                 should_wrap_around=True):
+                 should_wrap_around=True,
+                 mask_transform_fn=None,
+                 crop_size=(224, 224)):
         super().__init__()
         assert loader_mode in ['mp4', 'jpg']
         assert dataset_type in ['train', 'test']
+        self.dataset_path = dataset_path
         self.videos_path = os.path.join(dataset_path, get_videos_dir(loader_mode))
         self.annotations_path = os.path.join(dataset_path, f'Diving48_{dataset_version}_{dataset_type}.json')
         self.vocab_path = os.path.join(dataset_path, f'Diving48_vocab.json')
@@ -211,6 +216,8 @@ class Diving48Dataset(Dataset):
         self.extend_classes = extend_classes
         self.mask_type = mask_type
         self.should_wrap_around = should_wrap_around
+        self.mask_transform_fn = mask_transform_fn
+        self.crop_size = crop_size
         self._init_dataset()
 
     def _init_dataset(self):
@@ -277,10 +284,12 @@ class Diving48Dataset(Dataset):
             frames = pad_video(frames, self.num_frames)
 
         start = time.time()
-        frames = self._transform(frames, video_id, indices)
+        _, h, w, _ = frames.shape
+        transform_params = get_deterministic_transform_params(h, w, self.crop_size)
+        frames = self._transform(frames, video_id, indices, transform_params)
         transform_time = time.time() - start
 
-        return frames, io_time, transform_time
+        return frames, io_time, transform_time, indices, transform_params
 
     def _create_confounder_masks(self, label, size):
         _, t, h, w = size
@@ -297,22 +306,36 @@ class Diving48Dataset(Dataset):
         return np.zeros((1, self.num_frames // self.alpha, h, w), dtype=np.bool_), np.zeros((1, self.num_frames, h, w),
                                                                                             dtype=np.bool_)
 
-    def _get_mask(self, label, video_id, size):
+    def _get_mask(self, label, video_id, size, indices=None, transform_params=None):
+        if transform_params is None:
+            transform_params = {}
         if self.mask_type == 'confounder':
             return self._create_confounder_masks(label, size)
-        else:
+        elif self.mask_type == 'cache':
             _, _, h, w = size
             return self._read_mask(video_id, h, w)
+        elif self.mask_type == 'segments':
+            path = os.path.join(self.dataset_path, 'Segments', video_id)
+            mask = read_diver_segmentation_mask(path, indices).astype(np.bool_)
+            if self.mask_transform_fn is not None:
+                mask = self.mask_transform_fn(mask, **transform_params)
+                return mask
+
+            return mask
+        else:
+            raise ValueError(f'Unknown mask type: {self.mask_type}')
 
     def __getitem__(self, index):
         video_id = self.data[index]['vid_name']
         label = self.data[index]['label']
-        frames, io_time, transform_time = self._read_frames(video_id)
-        if self.mask_type is not None:
-            mask_slow, mask_fast = self._get_mask(label, video_id, frames.shape)
-            return frames, label, io_time, transform_time, video_id, mask_slow, mask_fast
 
-        return frames, label, io_time, transform_time, video_id, False, False
+        frames, io_time, transform_time, indices, transform_params = self._read_frames(video_id)
+
+        if self.mask_type is not None:
+            masks = self._get_mask(label, video_id, frames.shape, indices, transform_params)
+            return frames, label, io_time, transform_time, video_id, masks, indices
+
+        return frames, label, io_time, transform_time, video_id, False, indices
 
     def __len__(self):
         return self.num_videos
@@ -335,9 +358,9 @@ class Diving48Dataset(Dataset):
     def get_label(self, idx):
         return self.vocab[idx]
 
-    def _transform(self, frames, video_id, indices):
+    def _transform(self, frames, video_id, indices, transform_params):
         if self.transform_fn:
-            frames = self.transform_fn(frames, vidname=video_id, indices=indices)
+            frames = self.transform_fn(frames, vidname=video_id, indices=indices, **transform_params)
 
         return frames
 

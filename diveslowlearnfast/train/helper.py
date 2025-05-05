@@ -3,18 +3,18 @@ from typing import Iterator
 import pytorchvideo
 import torch
 
-from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize
+from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize, ShortSideScale
 from torch import autocast
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
-from torchvision.transforms.v2 import Compose, RandomCrop, RandomHorizontalFlip
+from torchvision.transforms.v2 import RandomCrop, RandomHorizontalFlip, Compose, Lambda
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
 from diveslowlearnfast.loss.rrr import DualPathRRRLoss, DualPathRRRLossV2
 from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo, KwargsCompose, CutoutSegment, \
-    RandomApply
+    RandomApply, DeterministicRandomShortSideScale, DeterministicRandomCrop, DeterministicHorizontalFlip
 
 
 def get_batch(loader: Iterator,
@@ -41,11 +41,8 @@ def get_randaug_transform(cfg: Config, crop_size, p=.5):
     return KwargsCompose([
         ToTensor4D(dtype=torch.uint8),
         Div255(),
-        RandomShortSideScale(
-            min_size=256,
-            max_size=320,
-        ),
-        RandomCrop(crop_size),
+        DeterministicRandomShortSideScale(),
+        DeterministicRandomCrop(crop_size),
         Permute(1, 0, 2, 3),
         pytorchvideo.transforms.rand_augment.RandAugment(
             num_layers=cfg.RAND_AUGMENT.NUM_LAYERS,
@@ -54,7 +51,7 @@ def get_randaug_transform(cfg: Config, crop_size, p=.5):
         ),
         Permute(1, 0, 2, 3),
         Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
-        RandomHorizontalFlip(p=0.5),
+        DeterministicHorizontalFlip(p=0.5),
     ])
 
 
@@ -63,16 +60,13 @@ def get_rotate_transform(cfg: Config, crop_size):
     return KwargsCompose([
         ToTensor4D(),
         Div255(),
-        RandomShortSideScale(
-            min_size=256,
-            max_size=320,
-        ),
-        RandomCrop(crop_size),
+        DeterministicRandomShortSideScale(),
+        DeterministicRandomCrop((crop_size, crop_size)),
         Permute(1, 0, 2, 3),  # From 3 x T x H X W -> T x 3 x H x W
         RandomRotateVideo(-angle, angle),
         Permute(1, 0, 2, 3),  # From T x 3 x H X W -> 3 x T x H x W
         Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
-        RandomHorizontalFlip(p=0.5),
+        DeterministicHorizontalFlip(p=0.5),
     ])
 
 
@@ -83,12 +77,12 @@ def get_cutout_segment_transform(cfg: Config, crop_size, p=.5):
         CutoutSegment(dataset_path=cfg.CUTOUT_SEGMENT.SEGMENTS_PATH, p=p),
         Permute(3, 0, 1, 2),  # From T x H X W x 3 -> 3 x T x H x W
         Div255(),
-        RandomShortSideScale(
+        DeterministicRandomShortSideScale(
             min_size=256,
             max_size=320,
         ),
-        RandomCrop(crop_size),
-        RandomHorizontalFlip(p=0.5),
+        DeterministicRandomCrop(crop_size),
+        DeterministicHorizontalFlip(p=0.5),
         Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
     ])
 
@@ -97,13 +91,13 @@ def get_base_transform(cfg, crop_size):
     return KwargsCompose([
         ToTensor4D(),
         Div255(),
-        RandomShortSideScale(
+        DeterministicRandomShortSideScale(
             min_size=256,
             max_size=320,
         ),
-        RandomCrop(crop_size),
+        DeterministicRandomCrop((crop_size, crop_size)),
         Normalize(mean=cfg.DATA.MEAN, std=cfg.DATA.STD),
-        RandomHorizontalFlip(p=0.5),
+        DeterministicHorizontalFlip(p=0.5),
     ])
 
 
@@ -140,6 +134,21 @@ def get_test_transform(cfg: Config):
             convert_to_float=False,
             crop_size=cfg.DATA.TEST_CROP_SIZE,
         ),
+    ])
+
+
+def _binary_mask_to_float_tensor(mask):
+    T, H, W = mask.shape
+    mask = torch.from_numpy(mask).float().unsqueeze(1)
+    mask = mask.expand(T, 3, H, W)
+    return mask.permute(1, 0, 2, 3)
+
+def get_mask_transform(cfg: Config):
+    return KwargsCompose([
+        _binary_mask_to_float_tensor,
+        DeterministicRandomShortSideScale(min_size=256, max_size=320),
+        DeterministicRandomCrop((cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE)),
+        DeterministicHorizontalFlip(),
     ])
 
 
@@ -205,7 +214,8 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
-            mask_type='confounder' if cfg.EGL.METHOD == 'confounder' else 'cache'
+            mask_type='confounder' if cfg.EGL.METHOD == 'confounder' else 'cache',
+            crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
         )
     else:
         return_train_dataset = Diving48Dataset(
@@ -223,6 +233,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
+            crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
         )
 
     # Here we do a cheeky swap with the wrapper and the dataset we actually want to return
