@@ -224,7 +224,7 @@ def main():
         epoch_bar.set_postfix({'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}'})
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
-            if type(model) is not GradCamExplainer:
+            if type(model) is GradCamExplainer:
                 save_checkpoint(model.gradcam.model, optimiser, epoch, cfg)
             else:
                 save_checkpoint(model, optimiser, epoch, cfg)
@@ -234,8 +234,13 @@ def main():
 
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
             model.eval()
+            # hacky way to use the the correct model if we are wrapping using a gradcam explainer
+            if type(model) is GradCamExplainer:
+                test_model = model.gradcam.model
+            else:
+                test_model = model
             test_acc = run_test_epoch(
-                model,
+                test_model,
                 test_loader,
                 device,
                 cfg,

@@ -333,9 +333,9 @@ class Diving48Dataset(Dataset):
 
         if self.mask_type is not None:
             masks = self._get_mask(label, video_id, frames.shape, indices, transform_params)
-            return frames, label, io_time, transform_time, video_id, masks, indices
+            return frames, label, io_time, transform_time, video_id, masks
 
-        return frames, label, io_time, transform_time, video_id, False, indices
+        return frames, label, io_time, transform_time, video_id, False
 
     def __len__(self):
         return self.num_videos

@@ -23,9 +23,9 @@ def get_batch(loader: Iterator,
               data_requires_grad: bool = False):
     if stats:
         with stats.timer('loader_time'):
-            xb, yb, io_times, transform_times, video_ids, masks_slow, masks_fast = next(loader)
+            xb, yb, io_times, transform_times, video_ids, masks = next(loader)
     else:
-        xb, yb, io_times, transform_times, video_ids, masks_slow, masks_fast = next(loader)
+        xb, yb, io_times, transform_times, video_ids, masks = next(loader)
 
     if stats:
         stats.update(
@@ -34,7 +34,7 @@ def get_batch(loader: Iterator,
         )
     xb = xb.to(device)
     xb.requires_grad = data_requires_grad
-    return xb, yb.to(device), video_ids, masks_slow.to(device), masks_fast.to(device)
+    return xb, yb.to(device), video_ids, masks
 
 
 def get_randaug_transform(cfg: Config, crop_size, p=.5):
