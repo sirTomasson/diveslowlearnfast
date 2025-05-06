@@ -291,12 +291,6 @@ class Diving48Dataset(Dataset):
 
         return frames, io_time, transform_time, indices, transform_params
 
-    def _create_confounder_masks(self, label, size):
-        _, t, h, w = size
-        mask = torch.zeros((1, t, h, w), dtype=torch.bool)
-        mask = superimpose_confounder(mask, label, binary=True)
-        return mask[:, ::self.alpha], mask[:]
-
     def _read_mask(self, video_id, h, w):
         mask_slow_filename = os.path.join(self.masks_cache_dir, 'slow', f'{video_id}.npy')
         mask_fast_filename = os.path.join(self.masks_cache_dir, 'fast', f'{video_id}.npy')
@@ -310,7 +304,7 @@ class Diving48Dataset(Dataset):
         if transform_params is None:
             transform_params = {}
         if self.mask_type == 'confounder':
-            return self._create_confounder_masks(label, size)
+            return False
         elif self.mask_type == 'cache':
             _, _, h, w = size
             return self._read_mask(video_id, h, w)

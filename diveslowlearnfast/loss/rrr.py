@@ -185,6 +185,7 @@ class DualPathRRRLossV2(nn.Module):
                 gradients = gradients / (torch.norm(gradients, dim=1, keepdim=True) + 1e-10)
 
             # Apply mask to gradients (A_gradX = tf.multiply(self.A, gradXes))
+            print(mask.shape, gradients.shape)
             masked_gradients = mask * gradients
 
             # L2 gradient penalty (l2_grads * tf.nn.l2_loss(A_gradX))

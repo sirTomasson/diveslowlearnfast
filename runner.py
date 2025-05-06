@@ -6,6 +6,7 @@ import logging
 from tqdm import tqdm
 
 from diveslowlearnfast.config import parse_args, save_config, to_dict, load_config, Config
+from diveslowlearnfast.egl.explainer import ConfounderExplainer, NoopExplainer
 from diveslowlearnfast.eval.run_eval_epoch import run_eval_epoch
 from diveslowlearnfast.models import SlowFast, save_checkpoint, load_checkpoint, get_parameter_count, \
     load_checkpoint_compat
@@ -33,6 +34,17 @@ def print_device_props(device):
     print(f"Device: {device_props.name}")
     print(f"Total memory: {device_props.total_memory / 1024 ** 2:.2f} MB")
     print(f"GPU number: {device_props.major}.{device_props.minor}")
+
+
+def get_model(model):
+    if type(model) is GradCamExplainer:
+        return model.gradcam.model
+    elif type(model) in [ConfounderExplainer, NoopExplainer]:
+        return model.model
+    elif type(model) is SlowFast:
+        return model
+    else:
+        raise ValueError(f'Unsupported model type: {type(model)}')
 
 
 def masks_exist(cfg: Config):
@@ -180,8 +192,14 @@ def main():
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
 
+    if cfg.EGL.ENABLED:
+        # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
+        model = ExplainerStrategy.get_explainer(model, cfg, device)
+        video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
+
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
+
     for epoch in epoch_bar:
         # if the threshold is set and the seed is None we want to reload the dataset and loader at each epoch
         # this will ensure a new sample from the dataset with the threshold is drawn so the model will see a higher
@@ -192,10 +210,6 @@ def main():
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
         if cfg.EGL.ENABLED:
-            # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
-            if type(model) is not GradCamExplainer:
-                model = ExplainerStrategy.get_explainer(model, cfg, device)
-
             train_acc, train_loss = run_egl_train_epoch(
                 model,
                 criterion,
@@ -205,7 +219,8 @@ def main():
                 cfg,
                 stats_db,
                 epoch,
-                scaler
+                scaler,
+                video_ids
             )
         else:
             train_acc, train_loss = run_train_epoch(
@@ -224,10 +239,7 @@ def main():
         epoch_bar.set_postfix({'acc': f'{train_acc:.3f}', 'train_loss': f'{train_loss:.3f}'})
 
         if epoch % cfg.TRAIN.CHECKPOINT_PERIOD == 0:
-            if type(model) is GradCamExplainer:
-                save_checkpoint(model.gradcam.model, optimiser, epoch, cfg)
-            else:
-                save_checkpoint(model, optimiser, epoch, cfg)
+            save_checkpoint(get_model(model), optimiser, epoch, cfg)
 
         stats['train_losses'].append(float(train_loss))
         stats['train_accuracies'].append(float(train_acc))
@@ -235,12 +247,9 @@ def main():
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
             model.eval()
             # hacky way to use the the correct model if we are wrapping using a gradcam explainer
-            if type(model) is GradCamExplainer:
-                test_model = model.gradcam.model
-            else:
-                test_model = model
+
             test_acc = run_test_epoch(
-                test_model,
+                get_model(model),
                 test_loader,
                 device,
                 cfg,

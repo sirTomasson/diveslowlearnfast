@@ -143,12 +143,18 @@ def _binary_mask_to_float_tensor(mask):
     mask = mask.expand(T, 3, H, W)
     return mask.permute(1, 0, 2, 3)
 
+
+def _float_tensor_to_binary_mask(mask):
+    mask = mask.permute(1, 0, 2, 3)
+    return mask[:, 0, :, :].to(dtype=torch.bool).unsqueeze(0)
+
 def get_mask_transform(cfg: Config):
     return KwargsCompose([
         _binary_mask_to_float_tensor,
         DeterministicRandomShortSideScale(min_size=256, max_size=320),
         DeterministicRandomCrop((cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE)),
         DeterministicHorizontalFlip(),
+        _float_tensor_to_binary_mask
     ])
 
 

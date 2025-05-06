@@ -18,7 +18,7 @@ class Diving48ConfounderDatasetWrapper(Dataset):
         self.inplace = cfg.CONFOUNDERS.INPLACE
 
     def __getitem__(self, idx):
-        frames, label, io_time, transform_time, video_id, smask, fmask = self.diving48[idx]
+        frames, label, io_time, transform_time, video_id, masks = self.diving48[idx]
         frames = superimpose_confounder(
             frames,
             label,
@@ -27,7 +27,7 @@ class Diving48ConfounderDatasetWrapper(Dataset):
             self.channel,
             self.inplace
         )
-        return frames, label, io_time, transform_time, video_id, smask, fmask
+        return frames, label, io_time, transform_time, video_id, masks
 
     def __len__(self):
         return len(self.diving48)

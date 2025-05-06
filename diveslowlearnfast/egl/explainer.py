@@ -25,6 +25,38 @@ class GradCamExplainer(nn.Module):
         localisation_maps, logits = self.gradcam(inputs, y)
         return localisation_maps, logits
 
+
+class ConfounderExplainer(nn.Module):
+
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+
+    def forward(self, inputs, y=None, **kwargs):
+        result = []
+        for inp in inputs:
+            sub_result = []
+            for x, y in zip(inp, y):
+                x = torch.zeros_like(x)
+                x = superimpose_confounder(x, y, inplace=True)
+                x = torch.mean(x, dim=0, keepdim=True)
+                sub_result.append(x)
+
+            result.append(torch.stack(sub_result))
+
+        return result, self.model(inputs)
+
+
+class NoopExplainer(nn.Module):
+
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, inputs, **kwargs):
+        return None, self.model(inputs)
+
 class ExplainerStrategy:
 
     @staticmethod
@@ -32,26 +64,12 @@ class ExplainerStrategy:
                       cfg: Config,
                       device: torch.device):
 
-        assert cfg.EGL.METHOD in ['gradcam', 'confounder']
-        if cfg.EGL.METHOD == 'gradcam':
+        assert cfg.EGL.METHOD in ['gradcam', 'confounder', 'ogl', 'cache']
+        if cfg.EGL.METHOD in ['gradcam', 'ogl']:
             return GradCamExplainer(model, cfg=cfg, device=device)
 
         elif cfg.EGL.METHOD == 'confounder':
-            def _confounder_explainer(inputs, yb):
-                result = []
-                for inp in inputs:
-                    sub_result = []
-                    for x, y in zip(inp, yb):
-                        x = torch.zeros_like(x)
-                        x = superimpose_confounder(x, y, inplace=True)
-                        x = torch.mean(x, dim=0, keepdim=True)
-                        sub_result.append(x)
+            return ConfounderExplainer(model)
 
-                    result.append(torch.stack(sub_result))
-
-                return result, model(inputs)
-
-            return _confounder_explainer
-
-        raise ValueError('Unsupported method')
+        return NoopExplainer(model)
 
