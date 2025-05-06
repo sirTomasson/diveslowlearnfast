@@ -195,7 +195,6 @@ def main():
     if cfg.EGL.ENABLED:
         # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
         model = ExplainerStrategy.get_explainer(model, cfg, device)
-        video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
 
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
@@ -210,6 +209,10 @@ def main():
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
         if cfg.EGL.ENABLED:
+            video_ids = None
+            if cfg.EGL.MASKS_PERIOD != -1 and (epoch % cfg.EGL.MASKS_PERIOD) == 0:
+                video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
+
             train_acc, train_loss = run_egl_train_epoch(
                 model,
                 criterion,

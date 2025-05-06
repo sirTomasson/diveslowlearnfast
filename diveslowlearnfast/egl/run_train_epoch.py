@@ -53,24 +53,28 @@ def add_losses_entry(stats_db: StatsDB, losses, epoch, cfg: Config):
     stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
 
 
-def get_masks(y_pred, y_true, localisation_maps, cfg, device):
+def get_masks(localisation_maps, cfg, device, indices=None):
     if cfg.EGL.METHOD in ['confounder', 'ogl', 'cache']:
-        print('hi m0m')
         return [map.to(device) for map in localisation_maps]
 
-    # Otherwise it the EGL.METHOD == 'gradcam'
-    generate_masks_indices = (y_pred != y_true).detach().cpu().numpy()
-    masks = generate_masks_from_localisation_maps(localisation_maps, cfg, generate_masks_indices)
+
+    masks = generate_masks_from_localisation_maps(localisation_maps, cfg, indices)
     return [torch.from_numpy(masks_slow_and_fast).to(device) for masks_slow_and_fast in masks]
 
 
-def get_loss_params(cfg: Config, localisation_maps, inputs, targets, logits, masks=None):
-    y_pred = torch.softmax(logits, dim=-1).argmax(dim=-1)
+def get_loss_params(cfg: Config,
+                    localisation_maps,
+                    inputs,
+                    targets,
+                    logits,
+                    masks=None,
+                    indices=None):
+
     if cfg.EGL.METHOD == 'cache':
         assert masks is not None
-        masks_from_localisation_maps = get_masks(y_pred, targets, masks, cfg, logits.device)
+        masks_from_localisation_maps = get_masks(masks, cfg, logits.device)
     else:
-        masks_from_localisation_maps = get_masks(y_pred, targets, localisation_maps, cfg, logits.device)
+        masks_from_localisation_maps = get_masks(localisation_maps, cfg, logits.device, indices)
 
     if cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
         return {
@@ -91,6 +95,13 @@ def get_loss_params(cfg: Config, localisation_maps, inputs, targets, logits, mas
         raise ValueError(f'Unknown loss function: {cfg.EGL.LOSS_FUNC}')
 
 
+def get_mask_indices(video_ids, hard_video_ids):
+    if video_ids is None or hard_video_ids is None:
+        return None
+
+    return np.array([video_id in hard_video_ids for video_id in video_ids])
+
+
 def run_train_epoch(model: nn.Module,
                     loss_fn: RRRLoss | DualPathRRRLoss,
                     optimiser: torch.optim.Optimizer,
@@ -100,7 +111,7 @@ def run_train_epoch(model: nn.Module,
                     stats_db: StatsDB,
                     epoch: int,
                     scaler: GradScaler = None,
-                    video_ids=None):
+                    hard_video_ids=None):
     batch_bar = tqdm(range(len(loader)), desc='Train EGL batch')
     n_batches_per_step = get_n_batches_per_step(cfg)
     loader_iter = iter(loader)
@@ -109,6 +120,7 @@ def run_train_epoch(model: nn.Module,
     Y_pred = []
     V_ids = []
     running_loss = 0.0
+    hard_video_ids = set(hard_video_ids)
     for i in batch_bar:
         with stats.timer('batch_time'):
             xb, yb, video_ids, masks = train_helper.get_batch(
@@ -126,7 +138,7 @@ def run_train_epoch(model: nn.Module,
 
             # 'model' is actually an explainer
             localisation_maps, logits = model(inputs)
-            params = get_loss_params(cfg, localisation_maps, inputs, yb, logits, masks=masks)
+            params = get_loss_params(cfg, localisation_maps, inputs, yb, logits, masks=masks, indices=get_mask_indices(video_ids, hard_video_ids))
             loss, losses = loss_fn(**params)
             add_losses_entry(stats_db, losses, epoch, cfg)
             loss /= n_batches_per_step  # scale loss by the number of batches in a step
