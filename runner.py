@@ -209,9 +209,10 @@ def main():
             train_loader, train_dataset = train_helper.get_train_loader_and_dataset(cfg)
 
         if cfg.EGL.ENABLED:
-            video_ids = None
+            video_ids = []
             if cfg.EGL.MASKS_PERIOD != -1 and (epoch % cfg.EGL.MASKS_PERIOD) == 0:
                 video_ids = egl_helper.get_difficult_video_ids(stats_db, start_epoch, cfg)
+                print(f'Found {len(video_ids)} difficult samples')
 
             train_acc, train_loss = run_egl_train_epoch(
                 model,

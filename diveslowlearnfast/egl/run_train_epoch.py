@@ -111,7 +111,7 @@ def run_train_epoch(model: nn.Module,
                     stats_db: StatsDB,
                     epoch: int,
                     scaler: GradScaler = None,
-                    hard_video_ids=None):
+                    hard_video_ids=[]):
     batch_bar = tqdm(range(len(loader)), desc='Train EGL batch')
     n_batches_per_step = get_n_batches_per_step(cfg)
     loader_iter = iter(loader)
@@ -138,7 +138,8 @@ def run_train_epoch(model: nn.Module,
 
             # 'model' is actually an explainer
             localisation_maps, logits = model(inputs)
-            params = get_loss_params(cfg, localisation_maps, inputs, yb, logits, masks=masks, indices=get_mask_indices(video_ids, hard_video_ids))
+            mask_indices = get_mask_indices(video_ids, hard_video_ids)
+            params = get_loss_params(cfg, localisation_maps, inputs, yb, logits, masks=masks, indices=mask_indices)
             loss, losses = loss_fn(**params)
             add_losses_entry(stats_db, losses, epoch, cfg)
             loss /= n_batches_per_step  # scale loss by the number of batches in a step
