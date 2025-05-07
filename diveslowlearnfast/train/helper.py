@@ -3,11 +3,10 @@ from typing import Iterator
 import pytorchvideo
 import torch
 
-from pytorchvideo.transforms import Div255, RandomShortSideScale, Normalize, ShortSideScale
+from pytorchvideo.transforms import Div255, Normalize
 from torch import autocast
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
-from torchvision.transforms.v2 import RandomCrop, RandomHorizontalFlip, Compose, Lambda
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
@@ -178,6 +177,7 @@ def get_test_objects(cfg, include_labels=None):
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         shuffle=False,
+        prefetch_factor=4
     )
 
     return test_loader
@@ -260,6 +260,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
         pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
         num_workers=cfg.DATA_LOADER.NUM_WORKERS,
         shuffle=True,
+        prefetch_factor=4
     )
     return train_loader, return_train_dataset
 

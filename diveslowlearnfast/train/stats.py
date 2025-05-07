@@ -220,7 +220,7 @@ class StatsDB:
 
 def wps_strategy(stats_db: StatsDB, cfg: Config):
     strategy = cfg.EGL.WORST_PERFORMER_STRATEGY
-    assert strategy in ['median', 'percentile', 'all']
+    assert strategy in ['median', 'percentile', 'all', 'classify']
     if strategy == 'median':
         return stats_db.get_below_median_samples
 
