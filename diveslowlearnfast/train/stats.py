@@ -242,6 +242,11 @@ def wps_strategy(stats_db: StatsDB, cfg: Config):
 
         return _wsp_all_strategy
 
+    def _wsp_none(**_kwargs):
+        return []
+
+    return _wsp_none
+
 
 class PerSampleStatisticsTest(unittest.TestCase):
 
