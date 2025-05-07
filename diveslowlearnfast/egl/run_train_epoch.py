@@ -11,7 +11,6 @@ from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.egl.generate_masks import generate_masks_from_localisation_maps
-from diveslowlearnfast.loss.rrr import RRRLoss, DualPathRRRLoss
 from diveslowlearnfast.models.utils import to_slowfast_inputs
 from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train import helper as train_helper

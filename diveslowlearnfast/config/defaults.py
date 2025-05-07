@@ -208,7 +208,7 @@ class GradCAMConfig:
 
 @dataclass
 class RRRConfig:
-    LAMBDAS: list[float] = field(default_factory=lambda: [1000.0, 1000.0])
+    LAMBDAS: list[float] = field(default_factory=lambda: [0.01, 0.01])
 
 
 @dataclass
@@ -218,6 +218,12 @@ class ConfoundersConfig:
     GRID_SIZE: int = 48
     CHANNEL: int = 1
     INPLACE: bool = True
+
+@dataclass
+class DiceConfig:
+    ALPHA: float = 1.0
+    BETA: float = 1.0
+    SMOOTH: float = 1e-8
 
 
 @dataclass
@@ -242,4 +248,5 @@ class Config:
     EGL: EGLConfig = field(default_factory=EGLConfig)
     GRADCAM: GradCAMConfig = field(default_factory=GradCAMConfig)
     RRR: RRRConfig = field(default_factory=RRRConfig)
+    DICE: DiceConfig = field(default_factory=DiceConfig)
     CONFOUNDERS: ConfoundersConfig = field(default_factory=ConfoundersConfig)

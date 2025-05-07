@@ -3,14 +3,16 @@ from typing import Iterator
 import pytorchvideo
 import torch
 
+import torch.nn as nn
+
 from pytorchvideo.transforms import Div255, Normalize
 from torch import autocast
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
-
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
-from diveslowlearnfast.loss.rrr import DualPathRRRLoss, DualPathRRRLossV2
+from diveslowlearnfast.loss.dice import DiceLoss
+from diveslowlearnfast.loss.rrr import RRRLoss
 from diveslowlearnfast.train.stats import Statistics
 from diveslowlearnfast.transforms import ToTensor4D, Permute, RandomRotateVideo, KwargsCompose, CutoutSegment, \
     RandomApply, DeterministicRandomShortSideScale, DeterministicRandomCrop, DeterministicHorizontalFlip
@@ -147,6 +149,7 @@ def _float_tensor_to_binary_mask(mask):
     mask = mask.permute(1, 0, 2, 3)
     return mask[:, 0, :, :].to(dtype=torch.bool).unsqueeze(0)
 
+
 def get_mask_transform(cfg: Config):
     return KwargsCompose([
         _binary_mask_to_float_tensor,
@@ -196,6 +199,17 @@ def get_include_labels(cfg):
     ).labels
 
 
+def get_mask_type(cfg: Config):
+    if cfg.EGL.METHOD == 'confounder':
+        return 'confounder'
+    elif cfg.EGL.METHOD == 'cache':
+        return 'cache'
+    elif cfg.EGL.METHOD == 'ogl':
+        return 'segments'
+    else:
+        return None
+
+
 def get_train_loader_and_dataset(cfg, video_ids=None):
     train_transform = get_train_transform(cfg)
 
@@ -204,12 +218,14 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
         include_labels = cfg.DATA.INCLUDE_LABELS
 
     if cfg.EGL.ENABLED:
+        mask_type = get_mask_type(cfg)
         return_train_dataset = Diving48Dataset(
             cfg.DATA.DATASET_PATH,
             cfg.DATA.NUM_FRAMES,
             alpha=cfg.SLOWFAST.ALPHA,
             dataset_type='train',
             transform_fn=train_transform,
+            mask_transform_fn=get_mask_transform(cfg),
             use_decord=cfg.DATA_LOADER.USE_DECORD,
             temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
             temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
@@ -220,7 +236,8 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
-            mask_type='confounder' if cfg.EGL.METHOD == 'confounder' else 'cache',
+            mask_type=mask_type,
+            loader_mode='jpg' if mask_type == 'segments' else 'mp4',
             crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
         )
     else:
@@ -265,6 +282,25 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, return_train_dataset
 
 
+def get_criterion(cfg: Config, class_weights, device: torch.device):
+    if cfg.MODEL.CLASS_WEIGHTS:
+        weights = torch.tensor(class_weights, dtype=torch.float32)
+        ce_loss = nn.CrossEntropyLoss(weight=weights).to(device)
+    else:
+        ce_loss = nn.CrossEntropyLoss()
+
+    if cfg.EGL.ENABLED:
+        assert cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2', 'dice']
+        if cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
+            criterion = RRRLoss(cfg.RRR.LAMBDAS, skip_zero_masks=True)
+        else:
+            criterion = DiceLoss(ce_loss, cfg.DICE.SMOOTH, cfg.DICE.ALPHA, cfg.DICE.BETA)
+    else:
+        criterion = ce_loss
+
+    return criterion
+
+
 def get_train_objects(cfg: Config, model, device: torch.device = torch.device('cpu'), video_ids=None):
     optimiser = torch.optim.SGD(
         model.parameters(),
@@ -275,18 +311,7 @@ def get_train_objects(cfg: Config, model, device: torch.device = torch.device('c
 
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
-    if cfg.EGL.ENABLED:
-        assert cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']
-        if cfg.EGL.LOSS_FUNC == 'rrr':
-            criterion = DualPathRRRLoss(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
-        else:
-            criterion = DualPathRRRLossV2(lambdas=cfg.RRR.LAMBDAS, skip_zero_masks=True)
-    else:
-        if cfg.MODEL.CLASS_WEIGHTS:
-            weights = torch.tensor(train_dataset.get_inverted_class_weights(), dtype=torch.float32)
-            criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
-        else:
-            criterion = torch.nn.CrossEntropyLoss()
+    criterion = get_criterion(cfg, train_dataset.get_inverted_class_weights(), device)
 
     scaler = None
     if cfg.TRAIN.AMP:

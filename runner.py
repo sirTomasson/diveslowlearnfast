@@ -184,7 +184,7 @@ def main():
 
     model.train()
     if checkpoint_path is None:
-        run_warmup(model, optimiser, criterion, train_loader, device, cfg)
+        run_warmup(model, optimiser, train_loader, device, cfg)
         optimiser = torch.optim.SGD(
             model.parameters(),
             lr=cfg.SOLVER.BASE_LR,
