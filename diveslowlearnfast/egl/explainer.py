@@ -12,18 +12,17 @@ class GradCamExplainer(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.device = device
-        self.gradcam = GradCAM(model,
-                               cfg.GRADCAM.TARGET_LAYERS,
-                               cfg.DATA.MEAN,
-                               cfg.DATA.STD,
-                               cfg.GRADCAM.COLORMAP)
+        self.model = GradCAM(model,
+                             cfg.GRADCAM.TARGET_LAYERS,
+                             cfg.DATA.MEAN,
+                             cfg.DATA.STD,
+                             cfg.GRADCAM.COLORMAP)
 
     def forward(self, inputs, y=None, **kwargs):
         if y is not None:
             y = y.to(self.device)
 
-        localisation_maps, logits = self.gradcam(inputs, y)
-        return localisation_maps, logits
+        return self.model(inputs, y)
 
 
 class ConfounderExplainer(nn.Module):
@@ -34,6 +33,10 @@ class ConfounderExplainer(nn.Module):
 
 
     def forward(self, inputs, y=None, **kwargs):
+        preds = self.model(inputs)
+        if not self.model.training:
+            return preds
+
         result = []
         for inp in inputs:
             sub_result = []
@@ -45,7 +48,7 @@ class ConfounderExplainer(nn.Module):
 
             result.append(torch.stack(sub_result))
 
-        return result, self.model(inputs)
+        return result, preds
 
 
 class NoopExplainer(nn.Module):

@@ -1,5 +1,7 @@
 # Adapted from https://github.com/facebookresearch/SlowFast
 import torch
+
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -21,14 +23,14 @@ def get_layer(model, layer_name):
     return prev_module
 
 
-class GradCAM:
+class GradCAM(nn.Module):
     """
     GradCAM class helps create localization maps using the Grad-CAM method for input videos
     and overlap the maps over the input videos as heatmaps.
     https://arxiv.org/pdf/1610.02391.pdf
     """
 
-    def __init__(self, model, target_layers, data_mean, data_std, colormap="viridis"):
+    def __init__(self, model, target_layers, data_mean, data_std, colormap="viridis", eval=False):
         """
         Args:
             model (model): the model to be used.
@@ -39,10 +41,12 @@ class GradCAM:
             colormap (Optional[str]): matplotlib colormap used to create heatmap.
                 See https://matplotlib.org/3.3.0/tutorials/colors/colormaps.html
         """
-
+        super().__init__()
         self.model = model
-        # Run in eval mode.
-        self.model.eval()
+        if eval:
+            self.model.eval()
+        else:
+            self.model.train()
         self.target_layers = target_layers
 
         self.gradients = {}
@@ -87,6 +91,8 @@ class GradCAM:
                 len(inputs) == len(self.target_layers)
         ), "Must register the same number of target layers as the number of input pathways."
         preds = self.model(inputs)
+        if not self.model.training:
+            return None, preds
 
         if labels is None:
             score = torch.max(preds, dim=-1)[0]
@@ -138,7 +144,7 @@ class GradCAM:
 
         return localization_maps, preds
 
-    def __call__(self, inputs, labels=None, alpha=0.5):
+    def forward(self, inputs, labels=None, alpha=0.5):
         """
         Visualize the localization maps on their corresponding inputs as heatmap,
         using Grad-CAM.
@@ -153,4 +159,7 @@ class GradCAM:
         localization_maps, preds = self._calculate_localization_map(
             inputs, labels=labels
         )
+        if not self.model.training:
+            return preds
+
         return localization_maps, preds

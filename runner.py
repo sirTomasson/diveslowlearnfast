@@ -38,7 +38,7 @@ def print_device_props(device):
 
 def get_model(model):
     if type(model) is GradCamExplainer:
-        return model.gradcam.model
+        return model.model.model
     elif type(model) in [ConfounderExplainer, NoopExplainer]:
         return model.model
     elif type(model) is SlowFast:
@@ -160,7 +160,7 @@ def main():
         eval_stats = {}
         logger.info('Running eval epoch')
         stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, stats_db, scaler)
-        print(f'Eval epoch complete, saving stats to {cfg.TRAIN.RESULT_DIR}')
+        print(f'Eval epoch complete, saving stats to {cfg.EVAL.RESULT_DIR}')
         save_stats(stats, cfg.EVAL.RESULT_DIR)
         return
 
@@ -250,10 +250,8 @@ def main():
 
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
             model.eval()
-            # hacky way to use the the correct model if we are wrapping using a gradcam explainer
-
             test_acc = run_test_epoch(
-                get_model(model),
+                model,
                 test_loader,
                 device,
                 cfg,
@@ -262,9 +260,9 @@ def main():
                 scaler,
             )
             if len(stats['test_accuracies']) == 0:
-                save_checkpoint(model, optimiser, epoch, cfg, 'best.pth')
+                save_checkpoint(get_model(model), optimiser, epoch, cfg, 'best.pth')
             elif test_acc > stats['test_accuracies'][-1]: # the current model is better than the previous model
-                save_checkpoint(model, optimiser, epoch, cfg, 'best.pth')
+                save_checkpoint(get_model(model), optimiser, epoch, cfg, 'best.pth')
 
             model.train()
             stats['test_accuracies'].append(float(test_acc))

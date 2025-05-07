@@ -30,7 +30,6 @@ def run_eval_epoch(model: nn.Module,
     Y_true = []
     Y_pred = []
     V_ids = []
-    losses = []
     for _ in eval_bar:
         xb, yb, io_times, transform_times, video_ids, *_ = next(loader_iter)
         o = train_helper.forward(model, xb, device, cfg, scaler)
@@ -45,10 +44,8 @@ def run_eval_epoch(model: nn.Module,
     stats_db.update(V_ids, Y_pred, Y_true, str(cfg.EVAL.RESULT_DIR), 'eval', -1)
     precision, recall, f1, _ = precision_recall_fscore_support(Y_true, Y_pred, average='macro')
     cnf_mat = confusion_matrix(Y_true, Y_pred, labels=labels)
-    loss = np.mean(losses)
     stats['eval'] = {
         'acc': acc,
-        'loss': loss,
         'precision': precision,
         'recall': recall,
         'f1': f1,

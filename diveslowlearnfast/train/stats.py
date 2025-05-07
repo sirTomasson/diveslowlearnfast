@@ -121,7 +121,7 @@ class StatsDB:
             data.append(epoch_end)
             epoch_end = 'AND epoch <= ?'
 
-        data.extend([run_id, split])
+        data.extend([split])
         query = f"""SELECT video_id, gt, (correct_n / n) as acc FROM(
             SELECT
                 video_id,
@@ -131,7 +131,6 @@ class StatsDB:
                 CAST(COUNT(*) as REAL) as n
             FROM stats
             WHERE epoch > ? {epoch_end}
-            AND run_id = ?
             AND split = ?
             GROUP BY video_id, gt
         ) ORDER BY acc

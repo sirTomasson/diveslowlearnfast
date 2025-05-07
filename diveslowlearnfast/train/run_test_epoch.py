@@ -48,7 +48,7 @@ def run_test_epoch(model: nn.Module,
             'io_time': f'{io_times.numpy().mean():.2f}s',
             'transform_time': f'{transform_times.numpy().mean():.2f}s',
             'batch_time': f'{avg_batch_time:.2f}s',
-            'acc': f'{acc:.3f}',
+            'acc': f'{np.mean(accuracies):.3f}',
         }
         batch_bar.set_postfix(postfix)
 
