@@ -9,10 +9,9 @@ from tqdm import tqdm
 
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.egl import GradCamExplainer
-from diveslowlearnfast.train import helper as train_helper
 from diveslowlearnfast.train.stats import StatsDB
 from diveslowlearnfast.eval import metrics
-
+from diveslowlearnfast.train import helper as train_helper
 
 def calculate_dice_factors(cfg: Config, attn_maps, masks):
     masks = [masks[:, :, ::cfg.SLOWFAST.ALPHA], masks[:]]
@@ -21,7 +20,7 @@ def calculate_dice_factors(cfg: Config, attn_maps, masks):
         attn_map = attn_map.detach().cpu()
         mask = mask.detach().cpu()
         dice_factor = metrics.dice_factor(mask, attn_map)
-        dice_factors.append(dice_factor)
+        dice_factors.append(dice_factor.mean().item())
 
     return dice_factors
 
@@ -33,7 +32,7 @@ def calculate_iou(cfg, attn_maps, masks):
         attn_map = attn_map.detach().cpu()
         mask = mask.detach().cpu()
         iou = metrics.iou(mask, attn_map)
-        ious.append(iou)
+        ious.append(iou.mean().item())
     return ious
 
 
@@ -46,7 +45,6 @@ def get_default_metrics_dict():
         'dice_fast': [],
     }
 
-@torch.no_grad()
 def run_test_epoch(model: nn.Module,
               loader: DataLoader,
               device,
@@ -63,6 +61,7 @@ def run_test_epoch(model: nn.Module,
     for _ in batch_bar:
         start_time = time.time()
         xb, yb, io_times, transform_times, video_ids, m = next(loader_iter)
+        xb.requires_grad = True
         loader_times.append(time.time() - start_time)
 
         start_time = time.time()

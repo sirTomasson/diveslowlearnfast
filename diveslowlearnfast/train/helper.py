@@ -172,6 +172,9 @@ def get_test_objects(cfg, include_labels=None):
         use_decord=cfg.DATA_LOADER.USE_DECORD,
         multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
         include_labels=include_labels,
+        loader_mode=cfg.DATA.FORMAT,
+        mask_type=get_mask_type(cfg),
+        crop_size=(cfg.DATA.TEST_CROP_SIZE, cfg.DATA.TEST_CROP_SIZE),
     )
 
     test_loader = DataLoader(

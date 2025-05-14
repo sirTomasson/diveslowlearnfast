@@ -261,7 +261,7 @@ def main():
                 epoch,
                 scaler,
             )
-            test_acc = np.mean(test_metrics['accuracy'])
+            test_acc = np.mean(test_metrics['accuracies'])
             if len(stats['test_accuracies']) == 0:
                 save_checkpoint(get_model(model), optimiser, epoch, cfg, 'best.pth')
             elif test_acc > stats['test_accuracies'][-1]: # the current model is better than the previous model

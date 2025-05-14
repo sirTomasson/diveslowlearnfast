@@ -225,6 +225,21 @@ def eval_stats(stats_path, **_kwargs):
     plt.show()
 
 
+def display_iou_metrics(stats_path, mode, which, **_kwargs):
+    with open(stats_path, 'rb') as f:
+        stats = json.load(f)
+
+    for which in ['iou_slow', 'iou_fast', 'dice_slow', 'dice_fast']:
+        metric = stats[f'{mode}_{which}']
+        plt.plot(metric, label=which)
+        plt.title(f'{stats_path} {mode.capitalize()} IoU')
+        plt.xlabel('Epoch')
+        plt.ylabel(f'{mode.capitalize()} IoU')
+
+    plt.grid()
+    plt.legend()
+    plt.show()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='SlowFast network runner',
@@ -238,7 +253,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--which', '-W',
-        help='Which stat to display options are: losses, accuracies',
+        help='Which stat to display options are: losses, accuracies, iou',
         default='loss'
     )
     parser.add_argument(
@@ -271,6 +286,8 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
     if args['mode'] == 'eval':
         eval_stats(**args)
+    elif args['which'] == 'iou':
+        display_iou_metrics(**args)
     elif args['all']:
         display_all(**args)
     else:

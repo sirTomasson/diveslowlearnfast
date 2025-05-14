@@ -10,9 +10,8 @@ from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset
 from diveslowlearnfast.egl.explainer import ExplainerStrategy
 from diveslowlearnfast.egl.generate_masks import generate_masks
-from diveslowlearnfast.train import StatsDB
 from diveslowlearnfast.train.helper import get_train_transform
-from diveslowlearnfast.train.stats import wps_strategy
+from diveslowlearnfast.train.stats import wps_strategy, StatsDB
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'ERROR'))
 
