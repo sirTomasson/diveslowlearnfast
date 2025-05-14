@@ -46,10 +46,15 @@ def calc_accuracy(Y_true, Y_pred):
 
 
 def add_losses_entry(stats_db: StatsDB, losses, epoch, cfg: Config):
-    stats_db.add_loss(losses['total_loss'], epoch, 'loss', str(cfg.TRAIN.RESULT_DIR), 'train')
-    stats_db.add_loss(losses['gradient_loss_path_0'], epoch, 'slow', str(cfg.TRAIN.RESULT_DIR), 'train')
-    stats_db.add_loss(losses['gradient_loss_path_1'], epoch, 'fast', str(cfg.TRAIN.RESULT_DIR), 'train')
-    stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
+    if cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
+        stats_db.add_loss(losses['total_loss'], epoch, 'loss', str(cfg.TRAIN.RESULT_DIR), 'train')
+        stats_db.add_loss(losses['gradient_loss_path_0'], epoch, 'slow', str(cfg.TRAIN.RESULT_DIR), 'train')
+        stats_db.add_loss(losses['gradient_loss_path_1'], epoch, 'fast', str(cfg.TRAIN.RESULT_DIR), 'train')
+        stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
+    elif cfg.EGL.LOSS_FUNC == 'dice':
+        stats_db.add_loss(losses['total_loss'], epoch, 'loss', str(cfg.TRAIN.RESULT_DIR), 'train')
+        stats_db.add_loss(losses['dice_loss'], epoch, 'dice', str(cfg.TRAIN.RESULT_DIR), 'train')
+        stats_db.add_loss(losses['ce_loss'], epoch, 'ce', str(cfg.TRAIN.RESULT_DIR), 'train')
 
 
 def get_masks(localisation_maps, cfg, device, indices=None):

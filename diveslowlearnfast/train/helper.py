@@ -237,7 +237,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
             mask_type=mask_type,
-            loader_mode='jpg' if mask_type == 'segments' else 'mp4',
+            loader_mode=cfg.DATA.FORMAT,
             crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
         )
     else:
@@ -256,6 +256,7 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
             video_ids=video_ids,
             include_labels=include_labels,
             extend_classes=cfg.DATA.EXTEND_CLASSES,
+            loader_mode=cfg.DATA.FORMAT,
             crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
         )
 
@@ -282,9 +283,9 @@ def get_train_loader_and_dataset(cfg, video_ids=None):
     return train_loader, return_train_dataset
 
 
-def get_criterion(cfg: Config, class_weights, device: torch.device):
+def get_criterion(cfg: Config, dataset: Diving48Dataset, device: torch.device):
     if cfg.MODEL.CLASS_WEIGHTS:
-        weights = torch.tensor(class_weights, dtype=torch.float32)
+        weights = torch.tensor(dataset.get_inverted_class_weights(), dtype=torch.float32)
         ce_loss = nn.CrossEntropyLoss(weight=weights).to(device)
     else:
         ce_loss = nn.CrossEntropyLoss()
@@ -311,7 +312,7 @@ def get_train_objects(cfg: Config, model, device: torch.device = torch.device('c
 
     train_loader, train_dataset = get_train_loader_and_dataset(cfg, video_ids)
 
-    criterion = get_criterion(cfg, train_dataset.get_inverted_class_weights(), device)
+    criterion = get_criterion(cfg, train_dataset, device)
 
     scaler = None
     if cfg.TRAIN.AMP:

@@ -25,6 +25,7 @@ class DataConfig:
     SEED: int = -1
     EXTEND_CLASSES: bool = False
     INCLUDE_LABELS: list[int] = field(default_factory=lambda: [])
+    FORMAT: str = 'mp4'
 
 
 @dataclass
@@ -221,8 +222,8 @@ class ConfoundersConfig:
 
 @dataclass
 class DiceConfig:
-    ALPHA: float = 1.0
-    BETA: float = 1.0
+    ALPHA: float = 0.5
+    BETA: float = 0.5
     SMOOTH: float = 1e-8
 
 

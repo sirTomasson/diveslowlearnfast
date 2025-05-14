@@ -28,4 +28,4 @@ class DiceLoss(nn.Module):
         ce_loss = self.alpha * self.ce_loss(logits, targets)
         dice_loss *= self.beta
         total_loss = ce_loss + dice_loss
-        return total_loss, { 'ce_loss': ce_loss, 'dice_loss': dice_loss, 'total_loss': total_loss }
+        return total_loss, { 'ce_loss': ce_loss.item(), 'dice_loss': dice_loss.item(), 'total_loss': total_loss.item() }
