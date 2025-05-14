@@ -1,8 +1,20 @@
+import torch
 import unittest
 
 import numpy as np
 
-def iou(gt, pred, dim=(0, 1)):
+def dice_factor(targets, preds, smooth=1e-8):
+    batch_size = preds.size(0)
+    gradcam_flat = preds.reshape(batch_size, -1)
+    targets_flat = targets.reshape(batch_size, -1)
+
+    intersection = torch.min(gradcam_flat, targets_flat).sum(dim=1)
+    predictions_sum = gradcam_flat.sum(dim=1)
+    targets_sum = targets_flat.sum(dim=1)
+
+    return (2.0 * intersection + smooth) / (predictions_sum + targets_sum + smooth)
+
+def iou(targets, preds, smooth=1e-8):
     """
     Calculate the Intersection over Union (IoU) between two sets of predictions.
     Args:
@@ -12,9 +24,13 @@ def iou(gt, pred, dim=(0, 1)):
     Returns:
         iou: float between 0 and 1
     """
-    overlap = gt * pred
-    union = (gt + pred) > 0
-    return overlap.sum(axis=dim) / union.sum(axis=dim)
+    batch_size = preds.size(0)
+    preds_flat = preds.reshape(batch_size, -1)
+    targets_flat = targets.reshape(batch_size, -1)
+
+    intersection = torch.min(preds_flat, targets_flat).sum(dim=1)
+    union = torch.max(preds_flat, targets_flat).sum(dim=1)
+    return intersection / (union + smooth)
 
 
 def wr(gt, exp, dim=(0, 1)):

@@ -1,5 +1,7 @@
 import copy
 import os
+
+import numpy as np
 import torch
 import logging
 
@@ -250,7 +252,7 @@ def main():
 
         if epoch % cfg.TRAIN.EVAL_PERIOD == 0:
             model.eval()
-            test_acc = run_test_epoch(
+            test_metrics = run_test_epoch(
                 model,
                 test_loader,
                 device,
@@ -259,6 +261,7 @@ def main():
                 epoch,
                 scaler,
             )
+            test_acc = np.mean(test_metrics['accuracy'])
             if len(stats['test_accuracies']) == 0:
                 save_checkpoint(get_model(model), optimiser, epoch, cfg, 'best.pth')
             elif test_acc > stats['test_accuracies'][-1]: # the current model is better than the previous model
@@ -266,6 +269,18 @@ def main():
 
             model.train()
             stats['test_accuracies'].append(float(test_acc))
+
+            if test_metrics.get('iou_slow') is not None:
+                dice_slow = np.mean(test_metrics['dice_slow'])
+                stats['test_dice_slow'].append(float(dice_slow))
+                dice_fast = np.mean(test_metrics['dice_fast'])
+                stats['test_dice_fast'].append(float(dice_fast))
+
+                iou_slow = np.mean(test_metrics['iou_slow'])
+                stats['test_iou_slow'].append(float(iou_slow))
+                iou_fast = np.mean(test_metrics['iou_fast'])
+                stats['test_iou_fast'].append(float(iou_fast))
+
 
         save_stats(stats, cfg.TRAIN.RESULT_DIR)
 

@@ -91,8 +91,6 @@ class GradCAM(nn.Module):
                 len(inputs) == len(self.target_layers)
         ), "Must register the same number of target layers as the number of input pathways."
         preds = self.model(inputs)
-        if not self.model.training:
-            return None, preds
 
         if labels is None:
             score = torch.max(preds, dim=-1)[0]
@@ -159,7 +157,5 @@ class GradCAM(nn.Module):
         localization_maps, preds = self._calculate_localization_map(
             inputs, labels=labels
         )
-        if not self.model.training:
-            return preds
 
         return localization_maps, preds

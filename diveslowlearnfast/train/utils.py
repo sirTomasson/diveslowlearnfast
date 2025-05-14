@@ -14,7 +14,11 @@ def load_stats(stats_path) -> dict:
             'train_losses': [],
             'train_accuracies': [],
             'test_losses': [],
-            'test_accuracies': []
+            'test_accuracies': [],
+            'test_iou_slow': [],
+            'test_iou_fast': [],
+            'test_dice_slow': [],
+            'test_dice_fast': []
         }
     with open(stats_path, 'r') as f:
         return json.load(f)
