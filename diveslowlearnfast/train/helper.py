@@ -108,7 +108,7 @@ def get_train_transform(cfg: Config, crop_size=None):
         transformations = list(filter(lambda x: x is not None, [
             get_randaug_transform(cfg, crop_size, p=1.0) if cfg.RAND_AUGMENT.ENABLED else None,
             get_rotate_transform(cfg, crop_size) if cfg.RANDOM_ROTATE.ENABLED else None,
-            get_cutout_segment_transform(cfg, crop_size, p=1.0) if cfg.CUTOUT_SEGMENT.ENABLED else None,
+            get_cutout_segment_transform(cfg, crop_size, p=cfg.CUTOUT_SEGMENT.PROB) if cfg.CUTOUT_SEGMENT.ENABLED else None,
             get_base_transform(cfg, crop_size)
         ]))
         assert len(transformations) > 0, 'At least one transform must be enabled'

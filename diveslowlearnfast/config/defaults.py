@@ -46,6 +46,7 @@ class RandomRotateConfig:
 class CutoutSegmentConfig:
     ENABLED: bool = False
     SEGMENTS_PATH: str = ''
+    PROB: float = 1.0
 
 
 @dataclass
