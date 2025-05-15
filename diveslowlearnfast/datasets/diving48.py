@@ -5,15 +5,14 @@ import av
 import os
 import time
 import logging
-import torch
 
 import numpy as np
 
 from torch.utils.data import Dataset
 
 from .utils import read_diver_segmentation_mask
-from diveslowlearnfast.datasets.superimpose_confounder import superimpose_confounder
 from diveslowlearnfast.datasets.utils import read_video_from_image_indices
+from diveslowlearnfast.memfs_cache import get_cache_instance
 from ..transforms import get_deterministic_transform_params
 
 logger = logging.getLogger(__name__)
@@ -46,13 +45,14 @@ def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal
     import decord
     from decord import cpu
 
-    vr = decord.VideoReader(video_path, ctx=cpu(0))
-    num_frames = num_frames if num_frames <= len(vr) else len(vr)
-    indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.int32)
-    indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
-    indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
-    frames = vr.get_batch(indices)
-    return frames.asnumpy(), indices
+    with get_cache_instance().open(video_path) as f:
+        vr = decord.VideoReader(video_path, ctx=cpu(0))
+        num_frames = num_frames if num_frames <= len(vr) else len(vr)
+        indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.int32)
+        indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
+        indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
+        frames = vr.get_batch(indices)
+        return frames.asnumpy(), indices
 
 
 def pad_video(video, size):
@@ -104,28 +104,29 @@ def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_r
 def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0,
                             temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
     """Efficiently load video frames using uniform sampling"""
-    container = av.open(video_path)
-    if multi_thread_decode:
-        container.streams.video[0].thread_type = 'AUTO'
-    video_stream = container.streams.video[0]
-    total_frames = video_stream.frames
-    num_frames = total_frames if num_frames == -1 else num_frames
+    with get_cache_instance().open(video_path) as f:
+        container = av.open(f)
+        if multi_thread_decode:
+            container.streams.video[0].thread_type = 'AUTO'
+        video_stream = container.streams.video[0]
+        total_frames = video_stream.frames
+        num_frames = total_frames if num_frames == -1 else num_frames
 
-    # Calculate timestamps for uniform sampling
-    indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
-    indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
-    indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
-    logger.debug(
-        f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
-    frames = []
+        # Calculate timestamps for uniform sampling
+        indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
+        indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
+        indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
+        logger.debug(
+            f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
+        frames = []
 
-    for idx, frame in enumerate(container.decode(video=0)):
-        counts = len(indices[np.isin(indices, idx)])
-        if counts > 0:
-            frames.extend(counts * [frame.to_ndarray(format='rgb24')])
+        for idx, frame in enumerate(container.decode(video=0)):
+            counts = len(indices[np.isin(indices, idx)])
+            if counts > 0:
+                frames.extend(counts * [frame.to_ndarray(format='rgb24')])
 
-    container.close()
-    return np.stack(frames), indices
+        container.close()
+        return np.stack(frames), indices
 
 
 def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,

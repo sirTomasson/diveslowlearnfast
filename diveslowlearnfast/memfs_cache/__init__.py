@@ -1,3 +1,3 @@
-__all__ = ['MemFSCache']
+__all__ = ['get_cache_instance']
 
-from .cache import MemFSCache
+from .cache import get_cache_instance
