@@ -1,6 +1,6 @@
 import logging
 import os
-
+import random
 import torch
 
 import numpy as np
@@ -97,7 +97,11 @@ def get_loss_params(cfg: Config,
     if cfg.EGL.METHOD == 'ogl' and cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
         # In this mode we'll invert the diver masks so the model will be penalised for high gradients were there is no
         # diver. In a subtle way kinda of similar to the CUTOUT_TRANSFORM method.
-        masks = ~masks
+        if random.random() > 0.5:
+            masks = ~masks
+        else:
+            masks = torch.zeros_like(masks)
+
         return {
             'logits': logits,
             'targets': targets,
