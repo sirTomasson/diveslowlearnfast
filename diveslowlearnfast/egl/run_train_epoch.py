@@ -94,7 +94,17 @@ def get_loss_params(cfg: Config,
         indices = get_mask_indices(cfg, targets, logits, video_ids, hard_video_ids)
         masks_from_localisation_maps = get_masks(localisation_maps, cfg, logits.device, indices)
 
-    if cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
+    if cfg.EGL.METHOD == 'ogl' and cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
+        # In this mode we'll invert the diver masks so the model will be penalised for high gradients were there is no
+        # diver. In a subtle way kinda of similar to the CUTOUT_TRANSFORM method.
+        masks = ~masks
+        return {
+            'logits': logits,
+            'targets': targets,
+            'masks': [masks[:, :, ::cfg.SLOWFAST.ALPHA].to(logits.device), masks[:].to(logits.device)],
+            'inputs': inputs,
+        }
+    elif cfg.EGL.LOSS_FUNC in ['rrr', 'rrr_v2']:
         return {
             'logits': logits,
             'targets': targets,
