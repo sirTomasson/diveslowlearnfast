@@ -229,6 +229,10 @@ class DiceConfig:
 
 
 @dataclass
+class IoUMetrics:
+    ENABLED: bool = False
+
+@dataclass
 class Config:
     NUM_GPUS: int = 1
     DATA: DataConfig = field(default_factory=DataConfig)
@@ -252,3 +256,4 @@ class Config:
     RRR: RRRConfig = field(default_factory=RRRConfig)
     DICE: DiceConfig = field(default_factory=DiceConfig)
     CONFOUNDERS: ConfoundersConfig = field(default_factory=ConfoundersConfig)
+    IOU_METRICS: IoUMetrics = field(default_factory=IoUMetrics)

@@ -66,14 +66,15 @@ def run_test_epoch(model: nn.Module,
 
         start_time = time.time()
         o = train_helper.forward(model, xb, device, cfg, scaler)
-        if type(model) is GradCamExplainer:
+        if cfg.EGL.ENABLED:
             logits = o[1]
-            dice_factors = calculate_dice_factors(cfg, o[0], m)
-            ious = calculate_iou(cfg, o[0], m)
-            metrics_dict['dice_slow'].append(dice_factors[0])
-            metrics_dict['dice_fast'].append(dice_factors[1])
-            metrics_dict['iou_slow'].append(ious[0])
-            metrics_dict['iou_fast'].append(ious[1])
+            if cfg.IOU_METRICS.ENABLED:
+                dice_factors = calculate_dice_factors(cfg, o[0], m)
+                ious = calculate_iou(cfg, o[0], m)
+                metrics_dict['dice_slow'].append(dice_factors[0])
+                metrics_dict['dice_fast'].append(dice_factors[1])
+                metrics_dict['iou_slow'].append(ious[0])
+                metrics_dict['iou_fast'].append(ious[1])
         else:
             logits = o
 

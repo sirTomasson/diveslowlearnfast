@@ -173,7 +173,7 @@ def get_test_objects(cfg, include_labels=None):
         multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
         include_labels=include_labels,
         loader_mode=cfg.DATA.FORMAT,
-        mask_type=get_mask_type(cfg),
+        mask_type=get_mask_type(cfg) if cfg.EGL.ENABLED else None,
         crop_size=(cfg.DATA.TEST_CROP_SIZE, cfg.DATA.TEST_CROP_SIZE),
     )
 

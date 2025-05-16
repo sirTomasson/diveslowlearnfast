@@ -5,6 +5,9 @@ import numpy as np
 
 from PIL import Image
 
+from diveslowlearnfast.memfs_cache import get_cache_instance
+
+
 def get_sample(dataset):
     result = next(iter(dataset))
     return result[0], result[1]
@@ -35,8 +38,9 @@ def read_video_from_image_indices(path, indices, format='jpg', dtype=np.float32)
             video.append(np.zeros(video[-1].shape, dtype=dtype))
             continue
 
-        img = Image.open(image_path)
-        video.append(np.array(img, dtype=dtype))
+        with get_cache_instance().open(image_path) as f:
+            img = Image.open(f)
+            video.append(np.array(img, dtype=dtype))
 
     return np.stack(video, dtype=dtype)
 
