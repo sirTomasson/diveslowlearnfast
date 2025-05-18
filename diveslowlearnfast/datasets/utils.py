@@ -38,9 +38,8 @@ def read_video_from_image_indices(path, indices, format='jpg', dtype=np.float32)
             video.append(np.zeros(video[-1].shape, dtype=dtype))
             continue
 
-        with get_cache_instance().open(image_path) as f:
-            img = Image.open(f)
-            video.append(np.array(img, dtype=dtype))
+        img = Image.open(image_path)
+        video.append(np.array(img, dtype=dtype))
 
     return np.stack(video, dtype=dtype)
 
