@@ -157,18 +157,6 @@ def main():
     print(f'model size      = {total_parameter_bytes / 1024 ** 2:.3f} MB')
     print(f'from checkpoint = {checkpoint_path}')
 
-    stats_db = StatsDB(cfg.TRAIN.STATS_DB)
-    if cfg.EVAL.ENABLED and checkpoint_path:
-        eval_stats = {}
-        logger.info('Running eval epoch')
-        stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, stats_db, scaler)
-        print(f'Eval epoch complete, saving stats to {cfg.EVAL.RESULT_DIR}')
-        save_stats(stats, cfg.EVAL.RESULT_DIR)
-        return
-
-    if not cfg.TRAIN.ENABLED:
-        return
-
     if cfg.MODEL.COMPILE:
         gpu_ok = False
         if torch.cuda.is_available():
@@ -197,6 +185,18 @@ def main():
     if cfg.EGL.ENABLED:
         # EGL is enabled we use an explainer model, which in addition to logits also returns a localisation map
         model = ExplainerStrategy.get_explainer(model, cfg, device)
+
+    stats_db = StatsDB(cfg.TRAIN.STATS_DB)
+    if cfg.EVAL.ENABLED and checkpoint_path:
+        eval_stats = { }
+        logger.info('Running eval epoch')
+        stats = run_eval_epoch(model, test_loader, device, cfg, train_dataset.labels, eval_stats, stats_db, scaler)
+        print(f'Eval epoch complete, saving stats to {cfg.EVAL.RESULT_DIR}')
+        save_stats(stats, cfg.EVAL.RESULT_DIR)
+        return
+
+    if not cfg.TRAIN.ENABLED:
+        return
 
     stats = load_stats(os.path.join(cfg.TRAIN.RESULT_DIR, 'stats.json'))
     epoch_bar = tqdm(range(start_epoch, cfg.SOLVER.MAX_EPOCH), desc=f'Train epoch')
