@@ -166,6 +166,7 @@ class TrainConfig:
 class EvalConfig:
     ENABLED: bool = False
     RESULT_DIR: Path = Path('results/eval')
+    IOU_METRICS: bool = False
 
 
 @dataclass

@@ -169,6 +169,7 @@ def get_test_objects(cfg, include_labels=None):
         cfg.SLOWFAST.ALPHA,
         dataset_type='test',
         transform_fn=test_transform,
+        mask_transform_fn=get_mask_transform(cfg),
         use_decord=cfg.DATA_LOADER.USE_DECORD,
         multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
         include_labels=include_labels,

@@ -1,7 +1,6 @@
-import os
-import torch
 
 import numpy as np
+import torch.nn.functional as F
 
 from torch import nn, GradScaler
 from torch.utils.data import DataLoader
@@ -30,6 +29,7 @@ def run_eval_epoch(model: nn.Module,
     Y_true = []
     Y_pred = []
     V_ids = []
+    model.eval()
     iou_metrics = {
         'dice_slow': [],
         'dice_fast': [],
@@ -41,7 +41,7 @@ def run_eval_epoch(model: nn.Module,
         o = train_helper.forward(model, xb, device, cfg, scaler)
         if cfg.EGL.ENABLED:
             logits = o[1]
-            if cfg.IOU_METRICS.ENABLED:
+            if cfg.EVAL.IOU_METRICS:
                 dice_factors = calculate_dice_factors(cfg, o[0], m)
                 ious = calculate_iou(cfg, o[0], m)
                 iou_metrics['dice_slow'].append(dice_factors[0])
@@ -51,7 +51,7 @@ def run_eval_epoch(model: nn.Module,
         else:
             logits = o
 
-        ypred = logits.argmax(dim=-1)
+        ypred =  F.softmax(logits, dim=-1).argmax(dim=-1)
         Y_true.extend(yb.numpy())
         Y_pred.extend(ypred.detach().cpu().numpy())
         V_ids.extend(video_ids)
@@ -70,9 +70,9 @@ def run_eval_epoch(model: nn.Module,
         'confusion_matrix': cnf_mat.tolist(),
         'labels': labels,
         'iou_slow': np.mean(iou_metrics['iou_slow']),
-        'iou_fast': np.mean(iou_metrics['iou_slow']),
-        'dice_slow': np.mean(iou_metrics['iou_slow']),
-        'dice_fast': np.mean(iou_metrics['iou_slow']),
+        'iou_fast': np.mean(iou_metrics['iou_fast']),
+        'dice_slow': np.mean(iou_metrics['dice_slow']),
+        'dice_fast': np.mean(iou_metrics['dice_fast']),
     }
 
     return stats
