@@ -41,14 +41,14 @@ def extend_under_represented_classes(data):
 
 
 def decord_load_video(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
-                      use_sampling_ratio=False, **kwargs):
+                      use_dynamic_temporal_stride=False, sampling_rate=1, **kwargs):
     import decord
     from decord import cpu
 
     vr = decord.VideoReader(video_path, ctx=cpu(0))
     num_frames = num_frames if num_frames <= len(vr) else len(vr)
-    indices = np.linspace(0, len(vr) - 1, num_frames, dtype=np.int32)
-    indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_sampling_ratio)
+    indices = get_video_indices(len(vr), num_frames, sampling_rate, use_dynamic_temporal_stride)
+    indices = temporal_random_offset_indices(indices, len(vr) - 1, temporal_random_offset, use_dynamic_temporal_stride)
     indices = temporal_random_jitter_indices(indices, len(vr) - 1, num_frames, temporal_random_jitter)
     frames = vr.get_batch(indices)
     return frames.asnumpy(), indices
@@ -71,18 +71,18 @@ def wrap_around(offset_indices, total_frames, min=0):
     return np.clip(result, min, total_frames)
 
 
-def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_sampling_ratio=False,
+def temporal_random_offset_indices(indices, total_frames, temporal_random_offset=0, use_dynamic_temporal_stride=False,
                                    should_wrap_around=True):
-    if temporal_random_offset == 0 and not use_sampling_ratio:
+    if temporal_random_offset == 0 and not use_dynamic_temporal_stride:
         return indices
 
-    if use_sampling_ratio:
+    if use_dynamic_temporal_stride:
         # ratio between total number frames and number of frames being sampled
         # total_frames/num_frames is the minimum by which we need to shift the indices in order to cover all frames
         # across different epochs. Calculating this dynamically may result in more stable behaviour.
         temporal_random_offset = math.floor(total_frames / len(indices))
         logger.debug(
-            f"use_sampling_ratio = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
+            f"use_dynamic_temporal_stride = True, calculating temporal_random_offset: {total_frames}/{len(indices)}={temporal_random_offset}")
 
     offset_indices = math.floor(random.uniform(min(indices), temporal_random_offset)) + indices
     if should_wrap_around:
@@ -100,8 +100,19 @@ def temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_r
     return np.sort(clipped)
 
 
+def get_video_indices(total_frames, num_frames, sampling_rate, use_dynamic_temporal_stride=False):
+    # Calculate timestamps for uniform sampling
+    if use_dynamic_temporal_stride:
+        indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
+    else:
+        size = num_frames * sampling_rate
+        start_index = 0 if total_frames < size else random.randint(0, total_frames - size)
+        indices = np.arange(start_index, start_index + size, sampling_rate)
+
+    return indices
+
 def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, temporal_random_jitter=0,
-                            temporal_random_offset=0, use_sampling_ratio=False, **kwargs):
+                            temporal_random_offset=0, use_dynamic_temporal_stride=False, sampling_rate=1, **kwargs):
     """Efficiently load video frames using uniform sampling"""
 
     container = av.open(video_path)
@@ -111,12 +122,11 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
     total_frames = video_stream.frames
     num_frames = total_frames if num_frames == -1 else num_frames
 
-    # Calculate timestamps for uniform sampling
-    indices = np.linspace(0, total_frames - 1, num_frames, dtype=np.int32)
-    indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_sampling_ratio)
+    indices = get_video_indices(total_frames, num_frames, sampling_rate, use_dynamic_temporal_stride)
+    indices = temporal_random_offset_indices(indices, total_frames - 1, temporal_random_offset, use_dynamic_temporal_stride)
     indices = temporal_random_jitter_indices(indices, total_frames - 1, num_frames, temporal_random_jitter)
     logger.debug(
-        f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_sampling_ratio}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
+        f'temporal_random_jitter = {temporal_random_jitter}, temporal_random_offset = {temporal_random_offset}, use_sampling_ratio = {use_dynamic_temporal_stride}, num_frames = {num_frames}, total_frames = {total_frames}, indices = {indices}')
     frames = []
 
     for idx, frame in enumerate(container.decode(video=0)):
@@ -129,11 +139,11 @@ def load_video_av_optimized(video_path, num_frames, multi_thread_decode=False, t
 
 
 def load_video_from_images(video_path, num_frames, temporal_random_jitter=0, temporal_random_offset=0,
-                           use_sampling_ratio=False, **kwargs):
+                           use_sampling_ratio=False, sampling_rate=1,  **kwargs):
     """Efficiently load video frames using uniform sampling"""
     total_frames = len(os.listdir(video_path))
 
-    indices = np.linspace(1, total_frames, num_frames, dtype=np.int32)
+    indices = get_video_indices(total_frames, num_frames, sampling_rate, use_sampling_ratio)
     indices = temporal_random_offset_indices(indices, total_frames, temporal_random_offset, use_sampling_ratio,
                                              should_wrap_around=False)
     indices = temporal_random_jitter_indices(indices, total_frames, num_frames, temporal_random_jitter)
@@ -183,7 +193,8 @@ class Diving48Dataset(Dataset):
                  threshold=-1,
                  seed=42,
                  include_labels=None,
-                 use_sampling_ratio=False,
+                 use_dynamic_temporal_stride=False,
+                 sampling_rate=1,
                  video_ids=None,
                  masks_cache_dir=None,
                  extend_classes=False,
@@ -210,7 +221,8 @@ class Diving48Dataset(Dataset):
         self.threshold = threshold
         self.seed = seed
         self.include_labels = include_labels
-        self.use_sampling_ratio = use_sampling_ratio
+        self.use_dynamic_temporal_stride = use_dynamic_temporal_stride
+        self.sampling_rate=sampling_rate
         self.include_video_ids = video_ids
         self.masks_cache_dir = masks_cache_dir
         self.extend_classes = extend_classes
@@ -277,7 +289,8 @@ class Diving48Dataset(Dataset):
                                           self.temporal_random_jitter,
                                           self.temporal_random_offset,
                                           multithread_decode=self.multi_thread_decode,
-                                          use_sampling_ratio=self.use_sampling_ratio)
+                                          use_dynamic_temporal_stride=self.use_dynamic_temporal_stride,
+                                          sampling_rate=self.sampling_rate)
         io_time = time.time() - start
 
         if len(frames) < self.num_frames:

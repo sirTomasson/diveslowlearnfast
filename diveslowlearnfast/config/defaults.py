@@ -19,7 +19,7 @@ class DataConfig:
     STD: tuple[float, float, float] = field(default_factory=lambda: (0.2, 0.2, 0.23))
     TEMPORAL_RANDOM_JITTER: int = 0
     TEMPORAL_RANDOM_OFFSET: int = 0
-    USE_SAMPLING_RATIO: bool = False
+    USE_DYNAMIC_TEMPORAL_STRIDE: bool = False
     MULTI_THREAD_DECODE: bool = False
     THRESHOLD: int = -1
     SEED: int = -1

@@ -59,7 +59,7 @@ def get_difficult_samples_loader_and_dataset(cfg, video_ids):
         temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
         multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
         threshold=cfg.DATA.THRESHOLD,
-        use_sampling_ratio=cfg.DATA.USE_SAMPLING_RATIO,
+        use_dynamic_temporal_stride=cfg.DATA.USE_DYNAMIC_TEMPORAL_STRIDE,
         video_ids=video_ids,
     )
 
