@@ -15,6 +15,8 @@ class DataConfig:
     TRAIN_CROP_SIZE: int = 224
     TEST_CROP_SIZE: int = 256
     DATASET_PATH: Path = None,
+    DATASET_NAME: str = 'Diving48',
+    FINE_DIVING_ROOT: str = '',
     MEAN: tuple[float, float, float] = field(default_factory=lambda: (0.31, 0.47, 0.5))
     STD: tuple[float, float, float] = field(default_factory=lambda: (0.2, 0.2, 0.23))
     TEMPORAL_RANDOM_JITTER: int = 0
@@ -159,6 +161,7 @@ class TrainConfig:
     RESULT_DIR: Path = Path('results')
     STATS_DB: Path = Path('results/stats.db')
     WEIGHTS_PATH: str = ''
+    WEIGHTS_FORMAT: str = 'caffe2'
     AMP: bool = False
 
 
@@ -222,6 +225,7 @@ class ConfoundersConfig:
     CHANNEL: int = 1
     INPLACE: bool = True
 
+
 @dataclass
 class DiceConfig:
     ALPHA: float = 0.5
@@ -230,8 +234,14 @@ class DiceConfig:
 
 
 @dataclass
-class IoUMetrics:
+class IoUMetricsConfig:
     ENABLED: bool = False
+
+
+@dataclass
+class FineDivingConfig:
+    ENABLED: bool = False
+
 
 @dataclass
 class Config:
@@ -257,4 +267,5 @@ class Config:
     RRR: RRRConfig = field(default_factory=RRRConfig)
     DICE: DiceConfig = field(default_factory=DiceConfig)
     CONFOUNDERS: ConfoundersConfig = field(default_factory=ConfoundersConfig)
-    IOU_METRICS: IoUMetrics = field(default_factory=IoUMetrics)
+    IOU_METRICS: IoUMetricsConfig = field(default_factory=IoUMetricsConfig)
+    FINE_DIVING: FineDivingConfig = field(default_factory=FineDivingConfig)

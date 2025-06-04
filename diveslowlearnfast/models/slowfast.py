@@ -2089,58 +2089,34 @@ class SlowFast(nn.Module):
             inplace_relu=cfg.MODEL.INPLACE_RELU,
         )
 
-        if cfg.DETECTION.ENABLE:
-            self.head = ResNetRoIHead(
-                dim_in=[
-                    width_per_group * 32,
-                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
-                ],
-                num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[
+        self.head = ResNetBasicHead(
+            dim_in=[
+                width_per_group * 32,
+                width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
+            ],
+            num_classes=cfg.MODEL.NUM_CLASSES,
+            pool_size=(
+                [None, None]
+                if cfg.MULTIGRID.SHORT_CYCLE
+                   or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                else [
                     [
                         cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
-                        1,
-                        1,
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
                     ],
-                    [cfg.DATA.NUM_FRAMES // pool_size[1][0], 1, 1],
-                ],
-                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2] * 2,
-                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR] * 2,
-                dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func=cfg.MODEL.HEAD_ACT,
-                aligned=cfg.DETECTION.ALIGNED,
-                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
-            )
-        else:
-            print()
-            self.head = ResNetBasicHead(
-                dim_in=[
-                    width_per_group * 32,
-                    width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
-                ],
-                num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=(
-                    [None, None]
-                    if cfg.MULTIGRID.SHORT_CYCLE
-                       or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                    else [
-                        [
-                            cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
-                        ],
-                        [
-                            cfg.DATA.NUM_FRAMES // pool_size[1][0],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
-                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
-                        ],
-                    ]
-                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
-                dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func=cfg.MODEL.HEAD_ACT,
-                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
-                cfg=cfg,
-            )
+                    [
+                        cfg.DATA.NUM_FRAMES // pool_size[1][0],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
+                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
+                    ],
+                ]
+            ),  # None for AdaptiveAvgPool3d((1, 1, 1))
+            dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            act_func=cfg.MODEL.HEAD_ACT,
+            detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+            cfg=cfg,
+        )
 
     def forward(self, x, bboxes=None):
         x = x[:]  # avoid pass by reference

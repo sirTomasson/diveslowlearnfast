@@ -11,6 +11,7 @@ from torch.amp import GradScaler
 from torch.utils.data import DataLoader
 from diveslowlearnfast.config import Config
 from diveslowlearnfast.datasets import Diving48Dataset, Diving48ConfounderDatasetWrapper
+from diveslowlearnfast.datasets.fine_diving import FineDivingFineDataset
 from diveslowlearnfast.loss.dice import DiceLoss
 from diveslowlearnfast.loss.rrr import RRRLoss
 from diveslowlearnfast.train.stats import Statistics
@@ -108,7 +109,8 @@ def get_train_transform(cfg: Config, crop_size=None):
         transformations = list(filter(lambda x: x is not None, [
             get_randaug_transform(cfg, crop_size, p=1.0) if cfg.RAND_AUGMENT.ENABLED else None,
             get_rotate_transform(cfg, crop_size) if cfg.RANDOM_ROTATE.ENABLED else None,
-            get_cutout_segment_transform(cfg, crop_size, p=cfg.CUTOUT_SEGMENT.PROB) if cfg.CUTOUT_SEGMENT.ENABLED else None,
+            get_cutout_segment_transform(cfg, crop_size,
+                                         p=cfg.CUTOUT_SEGMENT.PROB) if cfg.CUTOUT_SEGMENT.ENABLED else None,
             get_base_transform(cfg, crop_size)
         ]))
         assert len(transformations) > 0, 'At least one transform must be enabled'
@@ -163,21 +165,29 @@ def get_mask_transform(cfg: Config):
 def get_test_objects(cfg, include_labels=None):
     test_transform = get_test_transform(cfg)
 
-    test_dataset = Diving48Dataset(
-        cfg.DATA.DATASET_PATH,
-        cfg.DATA.NUM_FRAMES,
-        cfg.SLOWFAST.ALPHA,
-        dataset_type='test',
-        transform_fn=test_transform,
-        mask_transform_fn=get_mask_transform(cfg),
-        use_decord=cfg.DATA_LOADER.USE_DECORD,
-        multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
-        sampling_rate=cfg.DATA.SAMPLING_RATE,
-        include_labels=include_labels,
-        loader_mode=cfg.DATA.FORMAT,
-        mask_type=get_mask_type(cfg) if cfg.EGL.ENABLED else None,
-        crop_size=(cfg.DATA.TEST_CROP_SIZE, cfg.DATA.TEST_CROP_SIZE),
-    )
+    if cfg.FINE_DIVING.ENABLED:
+        test_dataset = FineDivingFineDataset(cfg, split='test', transform_fn=test_transform,
+                                             data=[
+                                                 ('Budapest2021Diving10mPlatformWomenFinal_2', 5),
+                                                 ('FINADivingWorldCup2021_Men3mSynchronised_final_r1', 9)
+                                             ]
+                                             )
+    else:
+        test_dataset = Diving48Dataset(
+            cfg.DATA.DATASET_PATH,
+            cfg.DATA.NUM_FRAMES,
+            cfg.SLOWFAST.ALPHA,
+            dataset_type='test',
+            transform_fn=test_transform,
+            mask_transform_fn=get_mask_transform(cfg),
+            use_decord=cfg.DATA_LOADER.USE_DECORD,
+            multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+            sampling_rate=cfg.DATA.SAMPLING_RATE,
+            include_labels=include_labels,
+            loader_mode=cfg.DATA.FORMAT,
+            mask_type=get_mask_type(cfg) if cfg.EGL.ENABLED else None,
+            crop_size=(cfg.DATA.TEST_CROP_SIZE, cfg.DATA.TEST_CROP_SIZE),
+        )
 
     test_loader = DataLoader(
         test_dataset,
@@ -218,65 +228,70 @@ def get_mask_type(cfg: Config):
 def get_train_loader_and_dataset(cfg, video_ids=None):
     train_transform = get_train_transform(cfg)
 
-    include_labels = None
-    if len(cfg.DATA.INCLUDE_LABELS) > 0:
-        include_labels = cfg.DATA.INCLUDE_LABELS
-
-    if cfg.EGL.ENABLED:
-        mask_type = get_mask_type(cfg)
-        return_train_dataset = Diving48Dataset(
-            cfg.DATA.DATASET_PATH,
-            cfg.DATA.NUM_FRAMES,
-            alpha=cfg.SLOWFAST.ALPHA,
-            dataset_type='train',
-            transform_fn=train_transform,
-            mask_transform_fn=get_mask_transform(cfg),
-            use_decord=cfg.DATA_LOADER.USE_DECORD,
-            temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
-            temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
-            multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
-            threshold=cfg.DATA.THRESHOLD,
-            use_dynamic_temporal_stride=cfg.DATA.USE_DYNAMIC_TEMPORAL_STRIDE,
-            masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR,
-            video_ids=video_ids,
-            include_labels=include_labels,
-            extend_classes=cfg.DATA.EXTEND_CLASSES,
-            mask_type=mask_type,
-            loader_mode=cfg.DATA.FORMAT,
-            crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
-        )
+    if cfg.FINE_DIVING.ENABLED:
+        assert not cfg.EGL.ENABLED, 'EGL is not available for FineDiving'
+        train_dataset = FineDivingFineDataset(cfg, transform_fn=train_transform)
+        return_train_dataset = train_dataset
     else:
-        return_train_dataset = Diving48Dataset(
-            cfg.DATA.DATASET_PATH,
-            cfg.DATA.NUM_FRAMES,
-            alpha=cfg.SLOWFAST.ALPHA,
-            dataset_type='train',
-            transform_fn=train_transform,
-            use_decord=cfg.DATA_LOADER.USE_DECORD,
-            temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
-            temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
-            multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
-            threshold=cfg.DATA.THRESHOLD,
-            use_dynamic_temporal_stride=cfg.DATA.USE_DYNAMIC_TEMPORAL_STRIDE,
-            sampling_rate=cfg.DATA.SAMPLING_RATE,
-            video_ids=video_ids,
-            include_labels=include_labels,
-            extend_classes=cfg.DATA.EXTEND_CLASSES,
-            loader_mode=cfg.DATA.FORMAT,
-            crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
-        )
+        include_labels = None
+        if len(cfg.DATA.INCLUDE_LABELS) > 0:
+            include_labels = cfg.DATA.INCLUDE_LABELS
 
-    # Here we do a cheeky swap with the wrapper and the dataset we actually want to return
-    # so essentially we are supplying the dataloader our ConfounderWrapper and returning the
-    # underlying dataset a.k.a return_train_dataset. The reason is that downstream code might use
-    # properties on `Diving48Dataset` that is not available on `Diving48ConfounderDatasetWrapper` ;)
-    if cfg.CONFOUNDERS.ENABLED:
-        train_dataset = Diving48ConfounderDatasetWrapper(
-            return_train_dataset,
-            cfg
-        )
-    else:
-        train_dataset = return_train_dataset
+        if cfg.EGL.ENABLED:
+            mask_type = get_mask_type(cfg)
+            return_train_dataset = Diving48Dataset(
+                cfg.DATA.DATASET_PATH,
+                cfg.DATA.NUM_FRAMES,
+                alpha=cfg.SLOWFAST.ALPHA,
+                dataset_type='train',
+                transform_fn=train_transform,
+                mask_transform_fn=get_mask_transform(cfg),
+                use_decord=cfg.DATA_LOADER.USE_DECORD,
+                temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
+                temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
+                multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+                threshold=cfg.DATA.THRESHOLD,
+                use_dynamic_temporal_stride=cfg.DATA.USE_DYNAMIC_TEMPORAL_STRIDE,
+                masks_cache_dir=cfg.EGL.MASKS_CACHE_DIR,
+                video_ids=video_ids,
+                include_labels=include_labels,
+                extend_classes=cfg.DATA.EXTEND_CLASSES,
+                mask_type=mask_type,
+                loader_mode=cfg.DATA.FORMAT,
+                crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
+            )
+        else:
+            return_train_dataset = Diving48Dataset(
+                cfg.DATA.DATASET_PATH,
+                cfg.DATA.NUM_FRAMES,
+                alpha=cfg.SLOWFAST.ALPHA,
+                dataset_type='train',
+                transform_fn=train_transform,
+                use_decord=cfg.DATA_LOADER.USE_DECORD,
+                temporal_random_jitter=cfg.DATA.TEMPORAL_RANDOM_JITTER,
+                temporal_random_offset=cfg.DATA.TEMPORAL_RANDOM_OFFSET,
+                multi_thread_decode=cfg.DATA.MULTI_THREAD_DECODE,
+                threshold=cfg.DATA.THRESHOLD,
+                use_dynamic_temporal_stride=cfg.DATA.USE_DYNAMIC_TEMPORAL_STRIDE,
+                sampling_rate=cfg.DATA.SAMPLING_RATE,
+                video_ids=video_ids,
+                include_labels=include_labels,
+                extend_classes=cfg.DATA.EXTEND_CLASSES,
+                loader_mode=cfg.DATA.FORMAT,
+                crop_size=(cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE),
+            )
+
+        # Here we do a cheeky swap with the wrapper and the dataset we actually want to return
+        # so essentially we are supplying the dataloader our ConfounderWrapper and returning the
+        # underlying dataset a.k.a return_train_dataset. The reason is that downstream code might use
+        # properties on `Diving48Dataset` that is not available on `Diving48ConfounderDatasetWrapper` ;)
+        if cfg.CONFOUNDERS.ENABLED:
+            train_dataset = Diving48ConfounderDatasetWrapper(
+                return_train_dataset,
+                cfg
+            )
+        else:
+            train_dataset = return_train_dataset
 
     train_loader = DataLoader(
         train_dataset,

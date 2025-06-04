@@ -12,8 +12,9 @@ class DeterministicRandomCrop(Transform):
         self.accepts_kwargs = True
 
     def forward(self, inputs, crop_params=None, **kwargs):
-        h, w = inputs.shape[:-2]
         if crop_params is None:
+            h, w = inputs.shape[-2:]
+
             crop_params = RandomCrop.get_params(torch.zeros((h, w)), output_size=self.size)
 
         return crop(inputs, *crop_params)

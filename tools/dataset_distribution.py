@@ -47,11 +47,11 @@ def main():
 
     plt.margins(x=0)  # Remove horizontal padding
     plt.grid()
-    plt.title('Diving48 dataset distribution')
-    plt.xlabel('class id')
-    plt.ylabel('count')
+    plt.title('Diving48 Dataset Distribution')
+    plt.xlabel('Class ID')
+    plt.ylabel('Count')
     plt.legend()
-    plt.savefig('../results/diving48_distribution.pgf')
+    plt.savefig('../results/diving48_distribution.png')
     plt.show()
 
 

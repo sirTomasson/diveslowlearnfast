@@ -26,7 +26,7 @@ class DeterministicRandomShortSideScale(Transform):
 
     def forward(self, inputs, short_side_scale_params=None, **kwargs):
         if short_side_scale_params is None:
-            h, w = inputs[-2:]
+            h, w = inputs.size()[-2:]
             new_h, new_w = get_short_side_scale_params(
                 h, w, self.min_size, self.max_size
             )
